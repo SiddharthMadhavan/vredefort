@@ -125,6 +125,16 @@ try {
   assert.equal(new Set([...hospitals.features.map(feature => feature.properties.id), ...unresolved.map(record => record.id)]).size, metadata.recordCount)
   assert.ok(hospitals.features.every(feature => feature.geometry.type === 'Point' && feature.geometry.coordinates.every(Number.isFinite) && feature.properties.osm_id && feature.properties.match_status === 'inferred_facility_match'))
   console.log(`Hospital dataset served correctly: ${metadata.mappedCount} inferred matches; ${unresolved.length} preserved for review.`)
+  const fireFile = files.find(file => /^bengaluru-fire-stations-.*\.geojson$/.test(file))
+  assert.ok(fireFile)
+  const fireResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${fireFile}`)
+  assert.equal(fireResponse.status, 200)
+  const stations = await fireResponse.json()
+  assert.deepEqual(stations, JSON.parse(await fs.readFile('data/bengaluru-fire-stations.geojson', 'utf8')))
+  assert.equal(stations.features.length, 21)
+  assert.equal(new Set(stations.features.map(feature => feature.properties.id)).size, 21)
+  assert.ok(stations.features.every(feature => feature.geometry.type === 'Point' && feature.geometry.coordinates.every(Number.isFinite) && feature.properties.FIRE_STAName && feature.properties.coordinate_source === 'Original KML point'))
+  console.log('All 21 fire stations are bundled with valid original KML point coordinates.')
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }

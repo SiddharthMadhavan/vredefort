@@ -48,7 +48,7 @@ export function addWidthOverlay(map: Map, onReady: () => void, onError: () => vo
   const click = (event: MapMouseEvent) => {
     if (!visible || event.defaultPrevented) return
     const target = event.originalEvent.target
-    if (target instanceof Element && target.closest('.node-popup, .graph-node-marker')) return
+    if (target instanceof Element && target.closest('.node-popup, .graph-node-marker, .hospital-marker, .fire-station-marker')) return
     const features = map.queryRenderedFeatures(event.point, { layers: [WIDTH_HIT_ID] })
     let closest = null, distance = 64
     for (const feature of features) {

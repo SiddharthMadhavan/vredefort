@@ -82,7 +82,7 @@ export function addEdgeInteractions(map: Map, onSelection: (edge: SelectedEdge |
   const pick = (event: MapMouseEvent) => {
     if (!visible || event.defaultPrevented || !map.getLayer(ROAD_HIT_LAYER_ID)) return
     const target = event.originalEvent.target
-    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup')) return
+    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup, .hospital-marker, .fire-station-marker')) return
     const features = map.queryRenderedFeatures(event.point, { layers: [ROAD_HIT_LAYER_ID] })
     let nearest: MapGeoJSONFeature | null = null, distance = 8 ** 2
     for (const feature of features) {

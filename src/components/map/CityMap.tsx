@@ -11,6 +11,8 @@ import { addEdgeInteractions } from './edges'
 import { addWidthOverlay, WIDTH_SOURCE_ID, widthStatistics, type WidthField } from './widths'
 import { addHospitalOverlay } from './hospitals'
 import hospitalMetadata from '../../../data/bengaluru-hospitals.metadata.json'
+import { addFireStationOverlay } from './fireStations'
+import fireMetadata from '../../../data/bengaluru-fire-stations.metadata.json'
 
 type Status = 'loading' | 'ready' | 'error'
 export default function CityMap() {
@@ -20,6 +22,10 @@ export default function CityMap() {
   const edgeInteractions = useRef<ReturnType<typeof addEdgeInteractions> | null>(null)
   const widthOverlay = useRef<ReturnType<typeof addWidthOverlay> | null>(null)
   const hospitalOverlay = useRef<ReturnType<typeof addHospitalOverlay> | null>(null)
+  const fireOverlay = useRef<ReturnType<typeof addFireStationOverlay> | null>(null)
+  const [fireReady, setFireReady] = useState(false)
+  const [fireError, setFireError] = useState(false)
+  const [fireVisible, setFireVisible] = useState(true)
   const [hospitalsReady, setHospitalsReady] = useState(false)
   const [hospitalsError, setHospitalsError] = useState(false)
   const [hospitalsVisible, setHospitalsVisible] = useState(true)
@@ -50,6 +56,7 @@ export default function CityMap() {
     setWidthMode(true); setWidthField('RR_WIDTH_P'); setWidthReady(false); setWidthError(false); setWidthSelected(false)
     setGraphDataset('kml')
     setHospitalsReady(false); setHospitalsError(false); setHospitalsVisible(true)
+    setFireReady(false); setFireError(false); setFireVisible(true)
     if (configurationError && !keyFree) {
       setErrorMessage(configurationError)
       setStatus('error')
@@ -76,6 +83,7 @@ export default function CityMap() {
         clearTimeout(timeout)
         setStatus('ready')
         hospitalOverlay.current = addHospitalOverlay(instance!, () => setHospitalsReady(true), () => setHospitalsError(true))
+        fireOverlay.current = addFireStationOverlay(instance!, () => setFireReady(true), () => setFireError(true))
         try {
           if (instance) {
             roadsTimeout = setTimeout(() => setRoadsError(true), 20000)
@@ -106,7 +114,7 @@ export default function CityMap() {
       observer = new ResizeObserver(() => instance?.resize())
       observer.observe(container.current)
     } catch { setErrorMessage('The map could not start. Check that WebGL is enabled in your browser.'); setStatus('error') }
-    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); hospitalOverlay.current?.dispose(); hospitalOverlay.current = null; widthOverlay.current?.dispose(); widthOverlay.current = null; edgeInteractions.current?.dispose(); edgeInteractions.current = null; nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
+    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); fireOverlay.current?.dispose(); fireOverlay.current = null; hospitalOverlay.current?.dispose(); hospitalOverlay.current = null; widthOverlay.current?.dispose(); widthOverlay.current = null; edgeInteractions.current?.dispose(); edgeInteractions.current = null; nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
   }, [attempt, keyFree])
   const toggleRoads = () => {
     const map = mapRef.current
@@ -142,6 +150,7 @@ export default function CityMap() {
     <div className="width-controls">
       <button className="hospital-toggle" disabled={!hospitalsReady} aria-pressed={hospitalsVisible} onClick={() => { hospitalOverlay.current?.setVisible(!hospitalsVisible); setHospitalsVisible(!hospitalsVisible) }}>{hospitalsError ? 'Hospitals could not load' : !hospitalsReady ? 'Loading hospitals...' : `+ Hospitals ${hospitalsVisible ? 'on' : 'off'} (${hospitalMetadata.mappedCount})`}</button>
       <p className="hospital-summary">{hospitalMetadata.mappedCount}/{hospitalMetadata.recordCount} inferred matches; {hospitalMetadata.unresolvedCount} need review</p>
+      <button className="hospital-toggle fire-toggle" disabled={!fireReady} aria-pressed={fireVisible} onClick={() => { fireOverlay.current?.setVisible(!fireVisible); setFireVisible(!fireVisible) }}>{fireError ? 'Fire stations could not load' : !fireReady ? 'Loading fire stations...' : `F Fire stations ${fireVisible ? 'on' : 'off'} (${fireMetadata.featureCount})`}</button>
       <label>Road view<select value={widthMode ? 'width' : graphDataset} onChange={event => changeMode(event.target.value)}><option value="width">KML width shading</option><option value="kml">KML road graph</option><option value="osm">OSM road graph</option></select></label>
       {widthMode && <><label>Width field<select value={widthField} disabled={!widthReady} onChange={event => { const field = event.target.value as WidthField; widthOverlay.current?.setField(field); setWidthField(field) }}><option value="RR_WIDTH_P">RR_WIDTH_P</option><option value="RR_width_B">RR_width_B</option></select></label><div className="width-gradient"/><div className="width-range"><span>Narrow · {widthStatistics[widthField].min}</span><span>Wide · {widthStatistics[widthField].max}</span></div><p>Width units not specified in KML</p></>}
     </div>

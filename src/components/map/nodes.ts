@@ -97,14 +97,14 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
   }
   const move = (event: MapMouseEvent) => {
     const target = event.originalEvent.target
-    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup')) return
+    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup, .hospital-marker, .fire-station-marker')) return
     pendingPoint = event.point
     if (!frame) frame = requestAnimationFrame(locate)
   }
   const leave = () => { pendingPoint = null; if (!pinned) clear() }
   const click = (event: MapMouseEvent) => {
     const target = event.originalEvent.target
-    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup')) return
+    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup, .hospital-marker, .fire-station-marker')) return
     if (pinned) return
     pendingPoint = event.point
     locate() // Also supports tapping near a node on touch screens.
