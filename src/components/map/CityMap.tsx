@@ -13,6 +13,7 @@ import { addHospitalOverlay } from './hospitals'
 import hospitalMetadata from '../../../data/bengaluru-hospitals.metadata.json'
 import { addFireStationOverlay } from './fireStations'
 import fireMetadata from '../../../data/bengaluru-fire-stations.metadata.json'
+import { addVehicleOverlay } from './vehicles'
 
 type Status = 'loading' | 'ready' | 'error'
 export default function CityMap() {
@@ -23,6 +24,10 @@ export default function CityMap() {
   const widthOverlay = useRef<ReturnType<typeof addWidthOverlay> | null>(null)
   const hospitalOverlay = useRef<ReturnType<typeof addHospitalOverlay> | null>(null)
   const fireOverlay = useRef<ReturnType<typeof addFireStationOverlay> | null>(null)
+  const vehicleOverlay = useRef<ReturnType<typeof addVehicleOverlay> | null>(null)
+  const [vehicleCount, setVehicleCount] = useState<number | null>(null)
+  const [vehicleError, setVehicleError] = useState('')
+  const [vehicleAttempt, setVehicleAttempt] = useState(0)
   const [fireReady, setFireReady] = useState(false)
   const [fireError, setFireError] = useState(false)
   const [fireVisible, setFireVisible] = useState(true)
@@ -116,6 +121,14 @@ export default function CityMap() {
     } catch { setErrorMessage('The map could not start. Check that WebGL is enabled in your browser.'); setStatus('error') }
     return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); fireOverlay.current?.dispose(); fireOverlay.current = null; hospitalOverlay.current?.dispose(); hospitalOverlay.current = null; widthOverlay.current?.dispose(); widthOverlay.current = null; edgeInteractions.current?.dispose(); edgeInteractions.current = null; nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
   }, [attempt, keyFree])
+  useEffect(() => {
+    const map = mapRef.current
+    if (status !== 'ready' || !map) return
+    setVehicleCount(null); setVehicleError('')
+    const overlay = addVehicleOverlay(map, setVehicleCount, setVehicleError)
+    vehicleOverlay.current = overlay
+    return () => { overlay.dispose(); if (vehicleOverlay.current === overlay) vehicleOverlay.current = null }
+  }, [status, vehicleAttempt, attempt, keyFree])
   const toggleRoads = () => {
     const map = mapRef.current
     if (!map?.getLayer(ROAD_LAYER_ID)) return
@@ -148,6 +161,7 @@ export default function CityMap() {
     {edgeSelected && <button className="clear-edge-selection" onClick={() => edgeInteractions.current?.reset()}>Show all roads</button>}
     {widthSelected && <button className="clear-edge-selection" onClick={() => widthOverlay.current?.reset()}>Show all roads</button>}
     <div className="width-controls">
+      <div className="vehicle-status" role="status">{vehicleError ? <><span>Backend: {vehicleError}</span><button onClick={() => setVehicleAttempt(value => value + 1)}>Retry connection</button></> : vehicleCount === null ? 'Connecting to vehicle backend...' : <><span>{vehicleCount} cars / backend initialized</span><button onClick={() => vehicleOverlay.current?.focus()}>Focus cars</button></>}</div>
       <button className="hospital-toggle" disabled={!hospitalsReady} aria-pressed={hospitalsVisible} onClick={() => { hospitalOverlay.current?.setVisible(!hospitalsVisible); setHospitalsVisible(!hospitalsVisible) }}>{hospitalsError ? 'Hospitals could not load' : !hospitalsReady ? 'Loading hospitals...' : `+ Hospitals ${hospitalsVisible ? 'on' : 'off'} (${hospitalMetadata.mappedCount})`}</button>
       <p className="hospital-summary">{hospitalMetadata.providedCoordinateCount} supplied coordinates + {hospitalMetadata.inferredCount} inferred; {hospitalMetadata.unresolvedCount} need review</p>
       <button className="hospital-toggle fire-toggle" disabled={!fireReady} aria-pressed={fireVisible} onClick={() => { fireOverlay.current?.setVisible(!fireVisible); setFireVisible(!fireVisible) }}>{fireError ? 'Fire stations could not load' : !fireReady ? 'Loading fire stations...' : `F Fire stations ${fireVisible ? 'on' : 'off'} (${fireMetadata.featureCount})`}</button>

@@ -67,4 +67,8 @@ button, select { transition: background-color 120ms, border-color 120ms; }
 .fire-station-marker:hover { background: #4b3c23; }
 .fire-toggle { margin-bottom: 13px; color: #d0b685; }
 .hospital-reference { display: inline-block; margin-top: 12px; color: #b6dbb8; font-size: 17px; text-decoration: underline; }
+.vehicle-marker { width: 28px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; filter: drop-shadow(1px 2px 1px #000); }
+.vehicle-marker:hover { filter: drop-shadow(0 0 3px #8cb487); }
+.vehicle-status { border-bottom: 1px solid #3d5943; padding-bottom: 11px; margin-bottom: 11px; font-size: 17px; overflow-wrap: anywhere; }
+.vehicle-status button { display: block; margin-top: 6px; color: #b6dbb8; background: none; border: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 .hospital-marker::before, .fire-station-marker::before { content: ''; position: absolute; inset: -5px; }
