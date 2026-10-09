@@ -1,0 +1,28 @@
+{
+  "recordCount": 85,
+  "mappedCount": 11,
+  "unresolvedCount": 74,
+  "sources": [
+    {
+      "file": "290b2963-4d4c-4201-b372-fb1015aca151.csv",
+      "sha256": "dac758780973d008bbfd2eadd996f2354ebdaa461524bd9ef500b715baccb09a"
+    },
+    {
+      "file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+      "sha256": "0654c134ff4f53368adb83975e4badb89f460f22798c42a50908f1e0a1ffee45"
+    },
+    {
+      "file": "2547bb23-9022-4766-a31c-bd5fb2eae796.csv",
+      "sha256": "c053a559d99ac66e7e0584b9d6275405adab910fd5d9145c461ea53a9d5e30a7"
+    }
+  ],
+  "geocoder": "https://photon.komoot.io/api/",
+  "coordinateSource": "OpenStreetMap healthcare POIs via cached Photon queries and a bounded Overpass extract. Coordinates can represent building/site centroids.",
+  "matching": "Healthcare POI in Bengaluru bounds; distinctive-name token agreement >=75% or normalized spelling similarity >=88%. Available postcode conflicts and facility-type conflicts rejected. Address token agreement ranks candidates; close competing scores excluded. All matches are inferred and need verification.",
+  "unresolved": "Unmatched records retained separately. No address/locality centroid guesses.",
+  "osmExtract": {
+    "file": "hospital-osm-facilities.json",
+    "sha256": "2da1a36e332cf28dcb1701551c36aa01925615697ac131ce1bc178eeed1e437c",
+    "endpoint": "https://overpass-api.de/api/interpreter"
+  }
+}

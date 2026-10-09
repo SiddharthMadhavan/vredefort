@@ -112,6 +112,19 @@ try {
     assert.deepEqual(await response.json(), JSON.parse(await fs.readFile(`data/bengaluru-kml-road-${kind}.geojson`, 'utf8')))
   }
   console.log('Production KML graph nodes and edges are bundled and served correctly.')
+  const hospitalsFile = files.find(file => /^bengaluru-hospitals-.*\.geojson$/.test(file))
+  assert.ok(hospitalsFile, 'Hospital locations must be bundled')
+  const hospitalsResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${hospitalsFile}`)
+  assert.equal(hospitalsResponse.status, 200)
+  const hospitals = await hospitalsResponse.json()
+  assert.deepEqual(hospitals, JSON.parse(await fs.readFile('data/bengaluru-hospitals.geojson', 'utf8')))
+  const metadata = JSON.parse(await fs.readFile('data/bengaluru-hospitals.metadata.json', 'utf8'))
+  const unresolved = JSON.parse(await fs.readFile('data/bengaluru-hospitals.unresolved.json', 'utf8'))
+  assert.equal(hospitals.features.length, metadata.mappedCount)
+  assert.equal(hospitals.features.length + unresolved.length, metadata.recordCount)
+  assert.equal(new Set([...hospitals.features.map(feature => feature.properties.id), ...unresolved.map(record => record.id)]).size, metadata.recordCount)
+  assert.ok(hospitals.features.every(feature => feature.geometry.type === 'Point' && feature.geometry.coordinates.every(Number.isFinite) && feature.properties.osm_id && feature.properties.match_status === 'inferred_facility_match'))
+  console.log(`Hospital dataset served correctly: ${metadata.mappedCount} inferred matches; ${unresolved.length} preserved for review.`)
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }

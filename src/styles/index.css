@@ -57,3 +57,9 @@ button, select { transition: background-color 120ms, border-color 120ms; }
 .nodes-error { top: 112px; }
 @media (max-width: 420px) { .width-controls { width: 258px; padding: 11px; } .width-controls select { min-width: 155px; max-width: 164px; } }
 @media (prefers-reduced-motion: reduce) { button, select { transition: none; } }
+.hospital-marker { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1px solid #a4c9a7; background: #132d20; color: #c7efca; font-size: 27px; line-height: 1; cursor: pointer; box-shadow: 2px 2px 0 #0008; }
+.hospital-marker:hover { background: #2b5538; }
+.hospital-toggle { width: 100%; border: 1px solid #3d5943; color: #abd2ad; background: #15221a; padding: 7px; font: inherit; text-align: left; cursor: pointer; }
+.hospital-toggle:disabled { opacity: .6; cursor: default; }
+.width-controls .hospital-summary { margin: 7px 0 14px; }
+.hospital-popup .node-details dl { margin-top: 14px; }
