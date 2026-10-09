@@ -24,4 +24,13 @@ https://data.opencity.in/dataset/bengaluru-road-width-map used this to calculate
 
 remade the entire look into an awesome green terminal 90's kinda thing
 
+https://github.com/komoot/photon used this to geocode lat and long for the hospitals datset
+
+https://public.flourish.studio/visualisation/2915180/
+https://data.opencity.in/dataset/bengaluru-hospitals hospitals taken from here
+
+https://data.opencity.in/dataset/bengaluru-and-karnataka-fire-stations fire stations stolen from here
+
+
+
 refer to .env.example for api keys
