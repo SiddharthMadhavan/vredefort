@@ -16,7 +16,7 @@ export function addRoadOverlay(map: Map) {
     id: ROAD_LAYER_ID, type: 'line', source: ROAD_SOURCE_ID,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': '#c4a7ff',
+      'line-color': '#7eac85',
       'line-opacity': 1,
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 11, 2.5, 14, 4, 17, 7],
     },
@@ -24,6 +24,6 @@ export function addRoadOverlay(map: Map) {
   map.addLayer({
     id: ROAD_HIT_LAYER_ID, type: 'line', source: ROAD_SOURCE_ID,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-width': 14, 'line-color': '#c4a7ff', 'line-opacity': 0.001 },
+    paint: { 'line-width': 14, 'line-color': '#7eac85', 'line-opacity': 0.001 },
   })
 }

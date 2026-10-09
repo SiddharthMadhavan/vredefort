@@ -22,4 +22,6 @@ same thing done for the roads included length also!!
 
 https://data.opencity.in/dataset/bengaluru-road-width-map used this to calculate road widths and apply shading to the road renderings
 
+remade the entire look into an awesome green terminal 90's kinda thing
+
 refer to .env.example for api keys

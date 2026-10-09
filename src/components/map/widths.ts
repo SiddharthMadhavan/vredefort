@@ -12,7 +12,7 @@ export const widthStatistics = metadata.widthFields
 export function widthColor(field: WidthField): ExpressionSpecification {
   const { min, max } = widthStatistics[field]
   return ['case', ['all', ['has', field], ['>', ['to-number', ['get', field], 0], 0]],
-    ['interpolate', ['linear'], ['to-number', ['get', field], 0], min, '#ede2ff', min + (max - min) * .25, '#b8a0d6', min + (max - min) * .5, '#906bae', max, '#523069'], '#8b909a']
+    ['interpolate', ['linear'], ['to-number', ['get', field], 0], min, '#8a9290', min + (max - min) * .25, '#728479', min + (max - min) * .5, '#566f60', max, '#344b3c'], '#8b909a']
 }
 
 export function widthStroke(field: WidthField): ExpressionSpecification {

@@ -120,8 +120,8 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
   map.addSource(NODE_SOURCE_ID, { type: 'geojson', data: initialDataset })
   // A nearly transparent hit layer allows discovery without displaying
   // thousands of permanent dots. Only the nearest hovered node gets a marker.
-  map.addLayer({ id: HIT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, paint: { 'circle-radius': 12, 'circle-color': '#c4a7ff', 'circle-opacity': 0.001 } })
-  map.addLayer({ id: ENDPOINT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, filter: ['==', ['get', 'id'], ''], paint: { 'circle-radius': 4, 'circle-color': '#c4a7ff', 'circle-stroke-color': '#f4eaff', 'circle-stroke-width': 1.5 } })
+  map.addLayer({ id: HIT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, paint: { 'circle-radius': 12, 'circle-color': '#7eac85', 'circle-opacity': 0.001 } })
+  map.addLayer({ id: ENDPOINT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, filter: ['==', ['get', 'id'], ''], paint: { 'circle-radius': 4, 'circle-color': '#7eac85', 'circle-stroke-color': '#c4e5c4', 'circle-stroke-width': 1.5 } })
   map.on('mousemove', move)
   map.getContainer().addEventListener('mouseleave', leave)
   map.on('click', click)
