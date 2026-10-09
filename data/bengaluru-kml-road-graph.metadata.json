@@ -1,0 +1,29 @@
+{
+  "input": "data/bengaluru-road-widths.geojson",
+  "inputSha256": "c5e62b05383ff9c8e874519dd40f35d84a6e9119135e53137eed96ee0f9dea44",
+  "sourceFeatureCount": 23238,
+  "linePartCount": 23324,
+  "nodeCount": 3309,
+  "edgeCount": 4448,
+  "nodeKinds": {
+    "junction_candidate": 2394,
+    "endpoint": 915,
+    "loop_anchor": 0
+  },
+  "componentCount": 112,
+  "largestComponent": 3075,
+  "simplification": {
+    "removed_node_count": 20217,
+    "original_node_count": 23526,
+    "original_edge_count": 24665
+  },
+  "excludedSourceFeatures": [],
+  "numbering": "1-based number sorted by longitude then latitude. Stable ID kml_n_<exact longitude>_<exact latitude>. Numbers can shift after dataset changes.",
+  "topology": "Undirected multigraph. Split at endpoints and exactly shared/repeated stored vertices. Contract degree-two continuation nodes; retain one anchor for closed loops. Keep original geometry and KML road provenance.",
+  "lengths": "Haversine sum along the original geometry, metres, rounded to three decimal places.",
+  "limitations": [
+    "Geometric crossings and nearby endpoints are not joined without a shared stored coordinate.",
+    "Junction candidates are inferred, not verified physical junctions. Bridge/tunnel connectivity and turn restrictions are unavailable.",
+    "No one-way routing is inferred. KML widths remain on their original road records; merged graph edges can include multiple widths."
+  ]
+}

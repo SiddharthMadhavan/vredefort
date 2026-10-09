@@ -8,7 +8,8 @@ export function distanceMetres(a, b) {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(Math.min(1, h)))
 }
 
-export function buildRoadGraph(collection) {
+export function buildRoadGraph(collection, options = {}) {
+  const coordinateKey = options.coordinateKey || ((point) => `n_${Math.round(point[0] * 1e5)}_${Math.round(point[1] * 1e5)}`)
   if (collection.type !== 'FeatureCollection' || !collection.features.length) throw new Error('Expected nonempty GeoJSON FeatureCollection')
   const positions = new Map()
   const candidates = new Set()

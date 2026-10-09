@@ -104,6 +104,14 @@ try {
   assert.equal(widthsResponse.status, 200)
   assert.deepEqual(await widthsResponse.json(), JSON.parse(await fs.readFile('data/bengaluru-road-widths.geojson', 'utf8')))
   console.log('Production KML width dataset is bundled and served correctly.')
+  for (const kind of ['nodes', 'edges']) {
+    const file = files.find(file => file.startsWith(`bengaluru-kml-road-${kind}-`) && file.endsWith('.geojson'))
+    assert.ok(file, `Production must contain KML graph ${kind}`)
+    const response = await fetch(`http://127.0.0.1:${address.port}/assets/${file}`)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), JSON.parse(await fs.readFile(`data/bengaluru-kml-road-${kind}.geojson`, 'utf8')))
+  }
+  console.log('Production KML graph nodes and edges are bundled and served correctly.')
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }

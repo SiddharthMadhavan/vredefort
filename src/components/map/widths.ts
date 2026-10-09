@@ -15,6 +15,13 @@ export function widthColor(field: WidthField): ExpressionSpecification {
     ['interpolate', ['linear'], ['to-number', ['get', field], 0], min, '#ede2ff', min + (max - min) * .25, '#b8a0d6', min + (max - min) * .5, '#906bae', max, '#523069'], '#8b909a']
 }
 
+export function widthStroke(field: WidthField): ExpressionSpecification {
+  const { min, max } = widthStatistics[field]
+  // Keep the increase subtle: the widest roads are only 35% thicker.
+  const scale: ExpressionSpecification = ['interpolate', ['linear'], ['to-number', ['get', field], min], min, 1, max, 1.35]
+  return ['interpolate', ['linear'], ['zoom'], 10, ['*', 1.5, scale], 14, ['*', 3, scale], 18, ['*', 6, scale]]
+}
+
 export function addWidthOverlay(map: Map, onReady: () => void, onError: () => void, onSelected: (selected: boolean) => void) {
   let field: WidthField = 'RR_WIDTH_P'
   let visible = true, selected = false
@@ -35,7 +42,7 @@ export function addWidthOverlay(map: Map, onReady: () => void, onError: () => vo
   map.addSource(WIDTH_SOURCE_ID, { type: 'geojson', data: widthsUrl })
   map.addLayer({ id: WIDTH_LAYER_ID, type: 'line', source: WIDTH_SOURCE_ID, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: {
     'line-color': widthColor(field), 'line-opacity': 1,
-    'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 3, 18, 6],
+    'line-width': widthStroke(field),
   } })
   map.addLayer({ id: WIDTH_HIT_ID, type: 'line', source: WIDTH_SOURCE_ID, paint: { 'line-width': 14, 'line-opacity': .001, 'line-color': '#ffffff' } })
   const click = (event: MapMouseEvent) => {
@@ -77,7 +84,7 @@ export function addWidthOverlay(map: Map, onReady: () => void, onError: () => vo
   map.getContainer().addEventListener('keydown', key)
   return {
     reset,
-    setField(value: WidthField) { reset(); field = value; map.setPaintProperty(WIDTH_LAYER_ID, 'line-color', widthColor(field)) },
+    setField(value: WidthField) { reset(); field = value; map.setPaintProperty(WIDTH_LAYER_ID, 'line-color', widthColor(field)); map.setPaintProperty(WIDTH_LAYER_ID, 'line-width', widthStroke(field)) },
     setVisible(value: boolean) {
       visible = value
       if (!value) reset()

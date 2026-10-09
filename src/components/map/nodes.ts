@@ -1,4 +1,4 @@
-import { Marker, Popup, type FilterSpecification, type Map, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl'
+import { Marker, Popup, type GeoJSONSource, type FilterSpecification, type Map, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl'
 import nodesUrl from '../../../data/bengaluru-road-nodes.geojson?url'
 
 export const NODE_SOURCE_ID = 'road-graph-nodes'
@@ -35,7 +35,7 @@ function details(node: GraphNode) {
   }
   const note = document.createElement('p')
   note.className = 'node-note'
-  note.textContent = 'Inferred from the major-road graph. Click the dot to keep these details open.'
+  note.textContent = 'Inferred from the selected road dataset. Click the dot to keep these details open.'
   content.append(title, kind, list, note)
   return content
 }
@@ -126,6 +126,12 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
   map.getContainer().addEventListener('mouseleave', leave)
   map.on('click', click)
   return {
+    setDataset(url: string) {
+      clear()
+      pendingPoint = null
+      const source = map.getSource(NODE_SOURCE_ID) as GeoJSONSource | undefined
+      source?.setData(url)
+    },
     setVisible(value: boolean) {
       visible = value
       if (!value) clear()

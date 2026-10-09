@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Map, AttributionControl } from 'maplibre-gl'
+import { Map, AttributionControl, type GeoJSONSource } from 'maplibre-gl'
+import osmEdgesUrl from '../../../data/bengaluru-road-edges.geojson?url'
+import osmNodesUrl from '../../../data/bengaluru-road-nodes.geojson?url'
+import kmlEdgesUrl from '../../../data/bengaluru-kml-road-edges.geojson?url'
+import kmlNodesUrl from '../../../data/bengaluru-kml-road-nodes.geojson?url'
 import { BENGALURU, INITIAL_ZOOM, KEY_FREE_MAP_STYLE, configurationError, mapRequest, mapStyle } from '../../config/map'
 import { addRoadOverlay, ROAD_LAYER_ID, ROAD_SOURCE_ID } from './roads'
 import { addNodeInteractions, NODE_SOURCE_ID } from './nodes'
@@ -23,6 +27,7 @@ export default function CityMap() {
   const [nodesError, setNodesError] = useState(false)
   const [edgeSelected, setEdgeSelected] = useState(false)
   const [widthMode, setWidthMode] = useState(true)
+  const [graphDataset, setGraphDataset] = useState<'kml' | 'osm'>('kml')
   const [widthField, setWidthField] = useState<WidthField>('RR_WIDTH_P')
   const [widthReady, setWidthReady] = useState(false)
   const [widthError, setWidthError] = useState(false)
@@ -37,6 +42,7 @@ export default function CityMap() {
     setNodesError(false)
     setEdgeSelected(false)
     setWidthMode(true); setWidthField('RR_WIDTH_P'); setWidthReady(false); setWidthError(false); setWidthSelected(false)
+    setGraphDataset('kml')
     if (configurationError && !keyFree) {
       setErrorMessage(configurationError)
       setStatus('error')
@@ -103,7 +109,17 @@ export default function CityMap() {
     widthOverlay.current?.setVisible(!roadsVisible && widthMode)
     setRoadsVisible(!roadsVisible)
   }
-  const changeMode = (value: boolean) => {
+  const changeMode = (mode: string) => {
+    const value = mode === 'width'
+    edgeInteractions.current?.reset()
+    nodeInteractions.current?.setEdgeEndpoints(null)
+    if (!value) {
+      const kml = mode === 'kml'
+      const source = mapRef.current?.getSource(ROAD_SOURCE_ID) as GeoJSONSource | undefined
+      source?.setData(kml ? kmlEdgesUrl : osmEdgesUrl)
+      nodeInteractions.current?.setDataset(kml ? kmlNodesUrl : osmNodesUrl)
+      setGraphDataset(kml ? 'kml' : 'osm')
+    }
     edgeInteractions.current?.setVisible(!value && roadsVisible)
     nodeInteractions.current?.setVisible(!value && roadsVisible)
     widthOverlay.current?.setVisible(value && roadsVisible)
@@ -115,7 +131,7 @@ export default function CityMap() {
     {edgeSelected && <button className="clear-edge-selection" onClick={() => edgeInteractions.current?.reset()}>Show all roads</button>}
     {widthSelected && <button className="clear-edge-selection" onClick={() => widthOverlay.current?.reset()}>Show all roads</button>}
     <div className="width-controls">
-      <label>Road view<select value={widthMode ? 'width' : 'graph'} onChange={event => changeMode(event.target.value === 'width')}><option value="width">KML width shading</option><option value="graph">OSM road graph</option></select></label>
+      <label>Road view<select value={widthMode ? 'width' : graphDataset} onChange={event => changeMode(event.target.value)}><option value="width">KML width shading</option><option value="kml">KML road graph</option><option value="osm">OSM road graph</option></select></label>
       {widthMode && <><label>Width field<select value={widthField} disabled={!widthReady} onChange={event => { const field = event.target.value as WidthField; widthOverlay.current?.setField(field); setWidthField(field) }}><option value="RR_WIDTH_P">RR_WIDTH_P</option><option value="RR_width_B">RR_width_B</option></select></label><div className="width-gradient"/><div className="width-range"><span>Narrow · {widthStatistics[widthField].min}</span><span>Wide · {widthStatistics[widthField].max}</span></div><p>Width units not specified in KML</p></>}
     </div>
     {status !== 'ready' && <div className="map-status" role={status === 'error' ? 'alert' : 'status'}>{status === 'loading' ? 'Loading map…' : <>{errorMessage} <button onClick={() => setAttempt(attempt + 1)}>Retry</button>{!keyFree && <button onClick={() => setKeyFree(true)}>Use key-free basemap</button>}</>}</div>}
