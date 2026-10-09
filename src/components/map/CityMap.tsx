@@ -4,6 +4,7 @@ import { BENGALURU, INITIAL_ZOOM, KEY_FREE_MAP_STYLE, configurationError, mapReq
 import { addRoadOverlay, ROAD_LAYER_ID, ROAD_SOURCE_ID } from './roads'
 import { addNodeInteractions, NODE_SOURCE_ID } from './nodes'
 import { addEdgeInteractions } from './edges'
+import { addWidthOverlay, WIDTH_SOURCE_ID, widthStatistics, type WidthField } from './widths'
 
 type Status = 'loading' | 'ready' | 'error'
 export default function CityMap() {
@@ -11,6 +12,7 @@ export default function CityMap() {
   const mapRef = useRef<Map | null>(null)
   const nodeInteractions = useRef<ReturnType<typeof addNodeInteractions> | null>(null)
   const edgeInteractions = useRef<ReturnType<typeof addEdgeInteractions> | null>(null)
+  const widthOverlay = useRef<ReturnType<typeof addWidthOverlay> | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [attempt, setAttempt] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
@@ -20,6 +22,11 @@ export default function CityMap() {
   const [roadsVisible, setRoadsVisible] = useState(true)
   const [nodesError, setNodesError] = useState(false)
   const [edgeSelected, setEdgeSelected] = useState(false)
+  const [widthMode, setWidthMode] = useState(true)
+  const [widthField, setWidthField] = useState<WidthField>('RR_WIDTH_P')
+  const [widthReady, setWidthReady] = useState(false)
+  const [widthError, setWidthError] = useState(false)
+  const [widthSelected, setWidthSelected] = useState(false)
   useEffect(() => {
     if (!container.current) return
     setStatus('loading')
@@ -29,6 +36,7 @@ export default function CityMap() {
     setRoadsVisible(true)
     setNodesError(false)
     setEdgeSelected(false)
+    setWidthMode(true); setWidthField('RR_WIDTH_P'); setWidthReady(false); setWidthError(false); setWidthSelected(false)
     if (configurationError && !keyFree) {
       setErrorMessage(configurationError)
       setStatus('error')
@@ -64,10 +72,15 @@ export default function CityMap() {
               setEdgeSelected(!!edge)
               nodeInteractions.current?.setEdgeEndpoints(edge ? [edge.source, edge.target] : null)
             })
+            edgeInteractions.current.setVisible(false)
+            nodeInteractions.current?.setVisible(false)
+            try { widthOverlay.current = addWidthOverlay(instance, () => { setWidthReady(true); setWidthError(false) }, () => setWidthError(true), setWidthSelected) }
+            catch { setWidthError(true) }
           }
         } catch { clearTimeout(roadsTimeout); setRoadsError(true) }
       })
       instance.on('error', (event) => {
+        if ('sourceId' in event && event.sourceId === WIDTH_SOURCE_ID) { setWidthError(true); return }
         if ('sourceId' in event && event.sourceId === NODE_SOURCE_ID) { setNodesError(true); return }
         if ('sourceId' in event && event.sourceId === ROAD_SOURCE_ID) { clearTimeout(roadsTimeout); setRoadsError(true); return }
         const { error } = event
@@ -80,22 +93,34 @@ export default function CityMap() {
       observer = new ResizeObserver(() => instance?.resize())
       observer.observe(container.current)
     } catch { setErrorMessage('The map could not start. Check that WebGL is enabled in your browser.'); setStatus('error') }
-    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); edgeInteractions.current?.dispose(); edgeInteractions.current = null; nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
+    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); widthOverlay.current?.dispose(); widthOverlay.current = null; edgeInteractions.current?.dispose(); edgeInteractions.current = null; nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
   }, [attempt, keyFree])
   const toggleRoads = () => {
     const map = mapRef.current
     if (!map?.getLayer(ROAD_LAYER_ID)) return
-    map.setLayoutProperty(ROAD_LAYER_ID, 'visibility', roadsVisible ? 'none' : 'visible')
-    edgeInteractions.current?.setVisible(!roadsVisible)
-    nodeInteractions.current?.setVisible(!roadsVisible)
+    edgeInteractions.current?.setVisible(!roadsVisible && !widthMode)
+    nodeInteractions.current?.setVisible(!roadsVisible && !widthMode)
+    widthOverlay.current?.setVisible(!roadsVisible && widthMode)
     setRoadsVisible(!roadsVisible)
+  }
+  const changeMode = (value: boolean) => {
+    edgeInteractions.current?.setVisible(!value && roadsVisible)
+    nodeInteractions.current?.setVisible(!value && roadsVisible)
+    widthOverlay.current?.setVisible(value && roadsVisible)
+    setWidthMode(value)
   }
   return <>
     <div ref={container} className="map-canvas" role="region" aria-label="Interactive Bengaluru map" />
-    {!roadsError && <button className="roads-toggle" disabled={!roadsReady} aria-pressed={roadsVisible} onClick={toggleRoads} title="Show or hide the real OpenStreetMap major-road dataset"><span className={roadsVisible ? 'roads-swatch' : 'roads-swatch roads-swatch-off'} aria-hidden="true"/>{roadsReady ? `Roads ${roadsVisible ? 'on' : 'off'}` : 'Loading roads…'}</button>}
+    <button className="roads-toggle" disabled={widthMode ? !widthReady : !roadsReady} aria-pressed={roadsVisible} onClick={toggleRoads} title="Show or hide the road dataset"><span className={roadsVisible ? 'roads-swatch' : 'roads-swatch roads-swatch-off'} aria-hidden="true"/>{(widthMode ? widthReady : roadsReady) ? `Roads ${roadsVisible ? 'on' : 'off'}` : 'Loading roads…'}</button>
     {edgeSelected && <button className="clear-edge-selection" onClick={() => edgeInteractions.current?.reset()}>Show all roads</button>}
+    {widthSelected && <button className="clear-edge-selection" onClick={() => widthOverlay.current?.reset()}>Show all roads</button>}
+    <div className="width-controls">
+      <label>Road view<select value={widthMode ? 'width' : 'graph'} onChange={event => changeMode(event.target.value === 'width')}><option value="width">KML width shading</option><option value="graph">OSM road graph</option></select></label>
+      {widthMode && <><label>Width field<select value={widthField} disabled={!widthReady} onChange={event => { const field = event.target.value as WidthField; widthOverlay.current?.setField(field); setWidthField(field) }}><option value="RR_WIDTH_P">RR_WIDTH_P</option><option value="RR_width_B">RR_width_B</option></select></label><div className="width-gradient"/><div className="width-range"><span>Narrow · {widthStatistics[widthField].min}</span><span>Wide · {widthStatistics[widthField].max}</span></div><p>Width units not specified in KML</p></>}
+    </div>
     {status !== 'ready' && <div className="map-status" role={status === 'error' ? 'alert' : 'status'}>{status === 'loading' ? 'Loading map…' : <>{errorMessage} <button onClick={() => setAttempt(attempt + 1)}>Retry</button>{!keyFree && <button onClick={() => setKeyFree(true)}>Use key-free basemap</button>}</>}</div>}
-    {roadsError && <div className="roads-error" role="alert">Road overlay could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
-    {nodesError && <div className="nodes-error" role="alert">Node details could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
+    {roadsError && !widthMode && <div className="roads-error" role="alert">Road overlay could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
+    {nodesError && !widthMode && <div className="nodes-error" role="alert">Node details could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
+    {widthError && widthMode && <div className="nodes-error" role="alert">Road widths could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
   </>
 }

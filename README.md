@@ -20,4 +20,6 @@ removed all the road continuation why did we even add them in the first place??
 hover effect over the map whenever the mouse is over a node and then details regarding the node (junction, endpoints, loop anchor) 
 same thing done for the roads included length also!!
 
+https://data.opencity.in/dataset/bengaluru-road-width-map used this to calculate road widths and apply shading to the road renderings
+
 refer to .env.example for api keys

@@ -52,6 +52,20 @@ try {
   const nodeIds = new Set(nodes.features.map(node => node.properties.id))
   assert.ok(edges.features.every(edge => nodeIds.has(edge.properties.source) && nodeIds.has(edge.properties.target)))
   console.log(`Development loads ${edges.features.length} graph edges with valid endpoint node IDs.`)
+  const widthsResponse = await fetch(`${origin}/data/bengaluru-road-widths.geojson`)
+  assert.equal(widthsResponse.status, 200)
+  const widths = await widthsResponse.json()
+  assert.equal(widths.features.length, 23238)
+  assert.equal(new Set(widths.features.map(feature => feature.properties.id)).size, 23238)
+  assert.ok(widths.features.every(feature => feature.geometry.type === 'MultiLineString' && feature.geometry.coordinates.every(line => line.length >= 2 && line.every(point => point.every(Number.isFinite)))))
+  const metadata = JSON.parse(await fs.readFile('data/bengaluru-road-widths.metadata.json', 'utf8'))
+  for (const field of ['RR_WIDTH_P', 'RR_width_B']) {
+    const values = widths.features.map(feature => feature.properties[field])
+    assert.ok(values.every(value => Number.isFinite(value) && value > 0))
+    assert.equal(Math.min(...values), metadata.widthFields[field].min)
+    assert.equal(Math.max(...values), metadata.widthFields[field].max)
+  }
+  console.log('Development serves 23,238 KML roads with valid geometry and width ranges.')
 } finally {
   await server.close()
 }
@@ -84,6 +98,12 @@ try {
   const edges = await edgesResponse.json()
   assert.deepEqual(edges, JSON.parse(await fs.readFile('data/bengaluru-road-edges.geojson', 'utf8')))
   console.log('Production graph edge dataset is bundled and served correctly.')
+  const widthsFile = files.find(file => /^bengaluru-road-widths-.*\.geojson$/.test(file))
+  assert.ok(widthsFile, 'Production must contain the KML width dataset')
+  const widthsResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${widthsFile}`)
+  assert.equal(widthsResponse.status, 200)
+  assert.deepEqual(await widthsResponse.json(), JSON.parse(await fs.readFile('data/bengaluru-road-widths.geojson', 'utf8')))
+  console.log('Production KML width dataset is bundled and served correctly.')
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }
