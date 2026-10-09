@@ -1,8 +1,5 @@
-node_modules/
-dist/
 .env
 .env.local
-*.tsbuildinfo
 .tmp/
 .cache/
 __pycache__/

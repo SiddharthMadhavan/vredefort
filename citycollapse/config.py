@@ -1,6 +1,5 @@
 """Raster tile configuration; compatible with existing local raster env settings."""
 import os
-from pathlib import Path
 from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 from .data import ROOT
 
@@ -23,4 +22,4 @@ def settings():
         query = dict(parse_qsl(parsed.query))
         query.setdefault('key', key)
         template = urlunsplit(parsed._replace(query=urlencode(query)))
-    return {'tile_url': template, 'attribution': values.get('CITYCOLLAPSE_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO | Hospital matches: OSM / ODbL'}
+    return {'tile_url': template, 'attribution': values.get('CITYCOLLAPSE_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO'}
