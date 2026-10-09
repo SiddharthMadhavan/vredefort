@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 import time
 import urllib.request
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from .data import ROOT
 from .geometry import project, unproject
 
@@ -136,7 +136,7 @@ def paint_map(camera, tiles, datasets, mode, field, roads_on, hospitals_on, fire
                 color, factor = width_style(road.properties, field, datasets['width_metadata']['widthFields'])
                 base = 1.5 + max(0, min(8, camera.zoom - 10)) * .56
             else:
-                color, factor, base = '#7eac85', 1, 1.5 + max(0, camera.zoom - 10) * .7
+                color, factor, base = '#33453a' if mode == 'Traffic simulation' else '#7eac85', 1, 1.5 + max(0, camera.zoom - 10) * .7
             for path in road.paths:
                 screen = [camera.screen(point) for point in path]
                 # Skip sub-pixel intermediate vertices for painting only, never change saved data.
@@ -183,3 +183,78 @@ def paint_cars(camera, vehicles):
             draw.polygon([rotate(-3, -5), rotate(3, -5), rotate(3, -1), rotate(-3, -1)], fill='#234c35')
             draw.polygon([rotate(-3, 3), rotate(3, 3), rotate(3, 6), rotate(-3, 6)], fill='#234c35')
     return image, hits
+
+
+def traffic_color(congestion):
+    """Green -> amber -> red, with a continuous and bounded palette."""
+    value = max(0.0, min(1.0, congestion))
+    a, b, fraction = ((61, 215, 108), (242, 197, 58), value * 2) if value <= .5 else ((242, 197, 58), (248, 62, 66), (value - .5) * 2)
+    return tuple(round(x + (y - x) * fraction) for x, y in zip(a, b))
+
+
+def traffic_paths(camera, view):
+    """Project/simplify paths only when the viewport changes."""
+    paths = []
+    for index in sorted(view['index'].query(camera.bounds)):
+        road = view['roads'][index]
+        for path in road.paths:
+            screen = [camera.screen(point) for point in path]
+            points = [screen[0]]
+            for point in screen[1:-1]:
+                if abs(point[0] - points[-1][0]) + abs(point[1] - points[-1][1]) >= 1.5:
+                    points.append(point)
+            points.append(screen[-1])
+            paths.append((road.id, tuple(points)))
+    return tuple(paths)
+
+
+class TrafficPainter:
+    """Paint static glow only on state/camera changes; motion uses native lines."""
+    def __init__(self):
+        self.camera, self.view, self.paths = None, None, ()
+
+    def paint(self, camera, view, result, selected=None):
+        if camera != self.camera or view is not self.view:
+            self.paths = traffic_paths(camera, view)
+            self.camera, self.view = camera, view
+        return paint_traffic(camera, view, result, selected, self.paths)
+
+    def frame(self, camera, view, result, selected=None):
+        from .traffic_animation import prepare_flow_paths
+        image = self.paint(camera, view, result, selected=selected)
+        return image, prepare_flow_paths(camera, self.paths, result)
+
+
+def paint_traffic(camera, view, result, selected=None, geometry=None):
+    """Transparent traffic layer; no Tk objects or mutation of model results."""
+    image = Image.new('RGBA', (camera.width, camera.height))
+    glow = Image.new('RGBA', image.size)
+    glow_draw, draw = ImageDraw.Draw(glow), ImageDraw.Draw(image)
+    paths, markers = [], []
+    base = max(2, min(6, 2 + (camera.zoom - 11) * .5))
+    for identifier, points in geometry if geometry is not None else traffic_paths(camera, view):
+        state = result.links[identifier]
+        severity = state.congestion
+        color = traffic_color(severity)
+        if state.closed:
+            paths.append((identifier, points, (104, 66, 68, 200), round(base)))
+            markers.append(points[len(points) // 2])
+        else:
+            width = round(base + severity)
+            alpha = round(24 + 105 * severity)
+            glow_draw.line(points, fill=(*color, alpha), width=width + 5 + round(5 * severity), joint='curve')
+            paths.append((identifier, points, (*color, 220), width))
+    image = Image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(3)), image)
+    draw = ImageDraw.Draw(image)
+    for identifier, points, color, width in paths:
+        if identifier == selected:
+            draw.line(points, fill='#d7eddc', width=width + 3, joint='curve')
+        draw.line(points, fill=color, width=max(1, width), joint='curve')
+    for x, y in markers:
+        draw.line((x - 4, y - 4, x + 4, y + 4), fill='#ff7272', width=2)
+        draw.line((x - 4, y + 4, x + 4, y - 4), fill='#ff7272', width=2)
+    for node in view['nodes']:
+        if node['id'] in result.blocked_nodes:
+            x, y = camera.screen(node['point'])
+            draw.rectangle((x - 6, y - 6, x + 6, y + 6), fill='#3b1519', outline='#ff7272', width=2)
+    return image

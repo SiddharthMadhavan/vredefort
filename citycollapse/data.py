@@ -86,6 +86,7 @@ def load_datasets():
         nodes, node_index = read_points(node_file)
         views[mode] = {'roads': roads, 'index': index, 'by_id': {road.id: road for road in roads}, 'nodes': nodes, 'node_index': node_index}
     graph = load_json('bengaluru-kml-road-graph.json')
+    views['Traffic simulation'] = views['KML road graph']
     for edge in graph['edges']:
         edge['cumulative'] = cumulative_lengths(edge['coordinates'])
     return {'views': views, 'graph': graph, 'hospitals': read_points('bengaluru-hospitals.geojson')[0], 'fire': read_points('bengaluru-fire-stations.geojson')[0], 'width_metadata': load_json('bengaluru-road-widths.metadata.json'), 'hospital_metadata': load_json('bengaluru-hospitals.metadata.json')}
