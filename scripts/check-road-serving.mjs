@@ -38,6 +38,20 @@ try {
   assert.ok(nodes.features.every(node => node.properties.kind !== 'continuation'))
   assert.ok(nodes.features.every(node => node.geometry.type === 'Point' && Number.isInteger(node.properties.number) && Number.isInteger(node.properties.degree)))
   console.log(`Development node dataset loads with ${nodes.features.length} graph points and no continuations.`)
+  const roadsModule = await fetch(`${origin}/src/components/map/roads.ts`).then(r => r.text())
+  const edgesImport = roadsModule.match(/from\s+["']([^"']+bengaluru-road-edges[^"']+)["']/)?.[1]
+  assert.ok(edgesImport, 'Road selection must use graph edges, not the original OSM segment IDs')
+  const edgesWrapper = await fetch(new URL(edgesImport, origin)).then(r => r.text())
+  const edgesUrl = edgesWrapper.match(/export default\s+["']([^"']+)["']/)?.[1]
+  assert.ok(edgesUrl)
+  const edgesResponse = await fetch(new URL(edgesUrl, origin))
+  assert.equal(edgesResponse.status, 200)
+  const edges = await edgesResponse.json()
+  const expectedEdges = JSON.parse(await fs.readFile('data/bengaluru-road-edges.geojson', 'utf8'))
+  assert.deepEqual(edges, expectedEdges)
+  const nodeIds = new Set(nodes.features.map(node => node.properties.id))
+  assert.ok(edges.features.every(edge => nodeIds.has(edge.properties.source) && nodeIds.has(edge.properties.target)))
+  console.log(`Development loads ${edges.features.length} graph edges with valid endpoint node IDs.`)
 } finally {
   await server.close()
 }
@@ -63,6 +77,13 @@ try {
   const original = JSON.parse(await fs.readFile('data/bengaluru-road-nodes.geojson', 'utf8'))
   assert.deepEqual(nodes, original)
   console.log('Production node dataset is bundled and matches the stored road graph.')
+  const edgesFile = files.find(file => /^bengaluru-road-edges-.*\.geojson$/.test(file))
+  assert.ok(edgesFile)
+  const edgesResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${edgesFile}`)
+  assert.equal(edgesResponse.status, 200)
+  const edges = await edgesResponse.json()
+  assert.deepEqual(edges, JSON.parse(await fs.readFile('data/bengaluru-road-edges.geojson', 'utf8')))
+  console.log('Production graph edge dataset is bundled and served correctly.')
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }

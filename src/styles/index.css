@@ -31,3 +31,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid #a497f8; outline-offs
 .node-note { font-size: 10px; color: #9990a7; line-height: 1.5; margin: 13px 0 0; }
 .nodes-error { position: absolute; top: 60px; left: 12px; padding: 10px 12px; background: #19171f; border-radius: 8px; font-size: 12px; }
 .nodes-error button { color: #c7b8ff; background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.show-all-roads, .clear-edge-selection { border: 1px solid #453851; border-radius: 6px; background: #30243f; color: #e4dbf6; padding: 8px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+.show-all-roads { margin-top: 14px; width: 100%; }
+.clear-edge-selection { position: absolute; top: 12px; left: 137px; }
+.show-all-roads:hover, .clear-edge-selection:hover { background: #453258; }
+.edge-details .node-kind { max-width: 240px; line-height: 1.5; }

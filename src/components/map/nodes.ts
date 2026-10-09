@@ -1,8 +1,9 @@
-import { Marker, Popup, type Map, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl'
+import { Marker, Popup, type FilterSpecification, type Map, type MapGeoJSONFeature, type MapMouseEvent } from 'maplibre-gl'
 import nodesUrl from '../../../data/bengaluru-road-nodes.geojson?url'
 
 export const NODE_SOURCE_ID = 'road-graph-nodes'
 const HIT_LAYER_ID = 'road-graph-node-hit-area'
+const ENDPOINT_LAYER_ID = 'selected-edge-endpoints'
 type GraphNode = { id: string; number: number; kind: string; degree: number; coordinates: [number, number] }
 const kindLabels: Record<string, string> = { junction_candidate: 'Junction candidate', endpoint: 'Road endpoint', loop_anchor: 'Loop anchor' }
 
@@ -96,16 +97,18 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
   }
   const move = (event: MapMouseEvent) => {
     const target = event.originalEvent.target
-    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup')) return
+    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup')) return
     pendingPoint = event.point
     if (!frame) frame = requestAnimationFrame(locate)
   }
   const leave = () => { pendingPoint = null; if (!pinned) clear() }
   const click = (event: MapMouseEvent) => {
+    const target = event.originalEvent.target
+    if (target instanceof Element && target.closest('.graph-node-marker, .node-popup, .edge-popup')) return
     if (pinned) return
     pendingPoint = event.point
     locate() // Also supports tapping near a node on touch screens.
-    if (active) pinned = true
+    if (active) { pinned = true; event.preventDefault() }
   }
   const loaded = (event: { sourceId?: string; sourceDataType?: string; isSourceLoaded?: boolean }) => {
     if (event.sourceId === NODE_SOURCE_ID && (event.isSourceLoaded || event.sourceDataType === 'content')) {
@@ -118,6 +121,7 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
   // A nearly transparent hit layer allows discovery without displaying
   // thousands of permanent dots. Only the nearest hovered node gets a marker.
   map.addLayer({ id: HIT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, paint: { 'circle-radius': 12, 'circle-color': '#c4a7ff', 'circle-opacity': 0.001 } })
+  map.addLayer({ id: ENDPOINT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, filter: ['==', ['get', 'id'], ''], paint: { 'circle-radius': 4, 'circle-color': '#c4a7ff', 'circle-stroke-color': '#f4eaff', 'circle-stroke-width': 1.5 } })
   map.on('mousemove', move)
   map.getContainer().addEventListener('mouseleave', leave)
   map.on('click', click)
@@ -125,7 +129,13 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
     setVisible(value: boolean) {
       visible = value
       if (!value) clear()
-      if (map.getLayer(HIT_LAYER_ID)) map.setLayoutProperty(HIT_LAYER_ID, 'visibility', value ? 'visible' : 'none')
+      for (const layer of [HIT_LAYER_ID, ENDPOINT_LAYER_ID]) if (map.getLayer(layer)) map.setLayoutProperty(layer, 'visibility', value ? 'visible' : 'none')
+    },
+    setEdgeEndpoints(ids: string[] | null) {
+      clear()
+      const filter: FilterSpecification | null = ids ? ['in', ['get', 'id'], ['literal', ids]] : null
+      if (map.getLayer(HIT_LAYER_ID)) map.setFilter(HIT_LAYER_ID, filter)
+      if (map.getLayer(ENDPOINT_LAYER_ID)) map.setFilter(ENDPOINT_LAYER_ID, filter || ['==', ['get', 'id'], ''])
     },
     dispose() {
       if (disposed) return

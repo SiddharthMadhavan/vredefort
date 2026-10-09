@@ -18,5 +18,6 @@ calculated graph from the road data and saved it to /data no need to run the mjs
 removed all the road continuation why did we even add them in the first place??
 
 hover effect over the map whenever the mouse is over a node and then details regarding the node (junction, endpoints, loop anchor) 
+same thing done for the roads included length also!!
 
 refer to .env.example for api keys
