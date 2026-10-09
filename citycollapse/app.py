@@ -1,4 +1,3 @@
-"""Minimal native map explorer. One Tk mainloop owns all UI state."""
 from concurrent.futures import ThreadPoolExecutor
 import ctypes
 from dataclasses import replace
@@ -150,7 +149,10 @@ class CityCollapseApp(ctk.CTk):
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
 
     def select_road(self, identifier):
-        road = self.network.roads_by_id[identifier]
+        network = self.network
+        if network is None:
+            return
+        road = network.roads_by_id[identifier]
         p = road.properties
         self.selection = ('road', identifier)
         self.detail_title.configure(text='ROAD / EDGE')
@@ -159,7 +161,7 @@ class CityCollapseApp(ctk.CTk):
         if p.get('names'):
             self.detail_text('Name\n' + ', '.join(p['names']))
         for label, node_id in [('Start node', p['source']), ('End node', p['target'])]:
-            node = self.network.nodes_by_id[node_id]
+            node = network.nodes_by_id[node_id]
             self.detail_text(f'{label}\n{node_id}')
             self.button(self.detail_body, f'Inspect node {node["number"]}',
                         lambda node_id=node_id: self.select_node(node_id),
@@ -169,7 +171,10 @@ class CityCollapseApp(ctk.CTk):
         self.invalidate()
 
     def select_node(self, identifier):
-        node = self.network.nodes_by_id[identifier]
+        network = self.network
+        if network is None:
+            return
+        node = network.nodes_by_id[identifier]
         self.selection = ('node', identifier)
         self.detail_title.configure(text=f'NODE {node["number"]}')
         self.clear_body()
@@ -178,7 +183,7 @@ class CityCollapseApp(ctk.CTk):
             f'ID\n{identifier}\n\nKind\n{node["kind"].replace("_", " ")}'
             f'\n\nLongitude / latitude\n{lon:.6f}, {lat:.6f}'
             f'\n\nDegree\n{node["degree"]}')
-        edges = self.network.edge_ids[identifier]
+        edges = network.edge_ids[identifier]
         self.detail_text(f'Connected edges ({len(edges)})')
         for edge_id in edges:
             button = self.button(
