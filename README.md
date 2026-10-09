@@ -13,5 +13,7 @@ added roads from benguluru using osm map's overpass api
 (saved and uploaded to github so no need to import again)
 
 calculated graph from the road data and saved it to /data no need to run the mjs again
+(5000 possible junctions rest all random stuff hopefully cuda guys can do it)
+
 
 refer to .env.example for api keys
