@@ -123,8 +123,20 @@ try {
   assert.equal(hospitals.features.length, metadata.mappedCount)
   assert.equal(hospitals.features.length + unresolved.length, metadata.recordCount)
   assert.equal(new Set([...hospitals.features.map(feature => feature.properties.id), ...unresolved.map(record => record.id)]).size, metadata.recordCount)
-  assert.ok(hospitals.features.every(feature => feature.geometry.type === 'Point' && feature.geometry.coordinates.every(Number.isFinite) && feature.properties.osm_id && feature.properties.match_status === 'inferred_facility_match'))
-  console.log(`Hospital dataset served correctly: ${metadata.mappedCount} inferred matches; ${unresolved.length} preserved for review.`)
+  assert.ok(hospitals.features.every(feature => feature.geometry.type === 'Point' && feature.geometry.coordinates.every(Number.isFinite) && (feature.properties.match_status === 'provided_coordinates' || feature.properties.osm_id && feature.properties.match_status === 'inferred_facility_match')))
+  const supplied = JSON.parse(await fs.readFile('data/hospitals-provided-coordinates.json', 'utf8'))
+  for (const row of supplied) {
+    const feature = hospitals.features.find(feature => feature.properties.Name === row.Name)
+    if (row.review_reason) {
+      assert.ok(!feature, 'Conflicting facility must stay out of the map')
+      assert.ok(unresolved.some(record => record.Name === row.Name))
+    } else {
+      assert.ok(feature)
+      assert.deepEqual(feature.geometry.coordinates, [row.longitude, row.latitude])
+      assert.equal(feature.properties.match_status, 'provided_coordinates')
+    }
+  }
+  console.log(`Hospital dataset served correctly: ${metadata.mappedCount} locations; supplied coordinates preserved; ${unresolved.length} retained for review.`)
   const fireFile = files.find(file => /^bengaluru-fire-stations-.*\.geojson$/.test(file))
   assert.ok(fireFile)
   const fireResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${fireFile}`)

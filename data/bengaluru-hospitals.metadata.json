@@ -1,7 +1,7 @@
 {
-  "recordCount": 85,
-  "mappedCount": 11,
-  "unresolvedCount": 74,
+  "recordCount": 100,
+  "mappedCount": 25,
+  "unresolvedCount": 75,
   "sources": [
     {
       "file": "290b2963-4d4c-4201-b372-fb1015aca151.csv",
@@ -24,5 +24,13 @@
     "file": "hospital-osm-facilities.json",
     "sha256": "2da1a36e332cf28dcb1701551c36aa01925615697ac131ce1bc178eeed1e437c",
     "endpoint": "https://overpass-api.de/api/interpreter"
+  },
+  "providedCoordinateCount": 14,
+  "inferredCount": 11,
+  "providedSource": {
+    "file": "hospitals-provided-coordinates.json",
+    "recordCount": 15,
+    "sha256": "d734ede3634597d75d76a16e660716b8dabac5b9b172848697f28fab0df3b0da",
+    "notes": "Coordinates and addresses supplied in chat; not independently verified. Google search links are reference searches, not official hospital websites. One conflicting facility is withheld for review."
   }
 }

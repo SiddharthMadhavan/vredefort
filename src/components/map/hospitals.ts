@@ -39,8 +39,22 @@ export function addHospitalOverlay(map: Map, onReady: () => void, onError: () =>
         }
         const note = document.createElement('p')
         note.className = 'node-note'
-        note.textContent = 'Inferred facility match from OpenStreetMap. Location needs verification; the CSV supplies no coordinates. Details reflect the original dataset.'
+        note.textContent = p.match_status === 'provided_coordinates'
+          ? 'Coordinates and address supplied by the user. Not independently verified.'
+          : 'Inferred facility match from OpenStreetMap. Location needs verification; the CSV supplies no coordinates. Details reflect the original dataset.'
         section.append(title, list, note)
+        if (typeof p.search_url === 'string') {
+          const url = new URL(p.search_url)
+          if (url.protocol === 'https:' && url.hostname === 'www.google.com' && url.pathname === '/search') {
+            const link = document.createElement('a')
+            link.href = url.href
+            link.target = '_blank'
+            link.rel = 'noopener noreferrer'
+            link.className = 'hospital-reference'
+            link.textContent = 'Hospital search reference ↗'
+            section.append(link)
+          }
+        }
         popup = new Popup({ className: 'node-popup hospital-popup', closeOnClick: false, maxWidth: '340px', offset: 15 }).setLngLat(hospital.geometry.coordinates).setDOMContent(section).addTo(map)
       })
       const marker = new Marker({ element: dot }).setLngLat(hospital.geometry.coordinates)

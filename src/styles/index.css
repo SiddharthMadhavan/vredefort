@@ -66,4 +66,5 @@ button, select { transition: background-color 120ms, border-color 120ms; }
 .fire-station-marker { width: 18px; height: 18px; padding: 0; border: 1px solid #cba96e; background: #2c2517; color: #e6c48a; font-size: 17px; line-height: 1; cursor: pointer; box-shadow: 1px 1px 0 #0008; }
 .fire-station-marker:hover { background: #4b3c23; }
 .fire-toggle { margin-bottom: 13px; color: #d0b685; }
+.hospital-reference { display: inline-block; margin-top: 12px; color: #b6dbb8; font-size: 17px; text-decoration: underline; }
 .hospital-marker::before, .fire-station-marker::before { content: ''; position: absolute; inset: -5px; }

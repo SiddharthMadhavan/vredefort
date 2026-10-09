@@ -10167,5 +10167,19 @@
         }
       }
     ]
+  },
+  {
+    "Name": "TLH Hospital KR Puram & Yelahanka",
+    "latitude": 12.9097,
+    "longitude": 77.565,
+    "Address": "Mysore Bank Colony, Phase 1, Banashankari Stage I, Banashankari, Bengaluru, Karnataka 560050",
+    "search_query": "tlh hospital kr puram",
+    "review_reason": "Facility name mentions KR Puram and Yelahanka, while supplied address is in Banashankari. Confirm which facility these coordinates identify.",
+    "id": "provided_hospital_41d3332ff36e",
+    "source_file": "hospitals-provided-coordinates.json",
+    "coordinate_source": "User-provided latitude/longitude",
+    "Type": "Hospital",
+    "search_url": "https://www.google.com/search?q=tlh+hospital+kr+puram",
+    "reason": "Facility name mentions KR Puram and Yelahanka, while supplied address is in Banashankari. Confirm which facility these coordinates identify."
   }
 ]

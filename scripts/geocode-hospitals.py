@@ -120,6 +120,9 @@ def main():
         metadata['osmExtract'] = {'file': osm_cache.name, 'sha256': hashlib.sha256(osm_cache.read_bytes()).hexdigest(), 'endpoint': 'https://overpass-api.de/api/interpreter'}
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     print(f'Saved {len(features)} mapped; {len(unresolved)} unresolved.', flush=True)
+    if (DATA / 'hospitals-provided-coordinates.json').exists():
+        import runpy
+        runpy.run_path(str(Path(__file__).with_name('merge-hospital-coordinates.py')), run_name='__main__')
 
 if __name__ == '__main__':
     main()
