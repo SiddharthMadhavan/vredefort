@@ -29,7 +29,10 @@ class CityCollapseApp(ctk.CTk):
             ctypes.windll.gdi32.AddFontResourceExW(str(FONT_FILE), 0x10, 0)
         super().__init__()
         self.title('CityCollapse / Bengaluru')
-        self.geometry('1400x900')
+        scale = self._get_window_scaling()
+        width = min(1400, int((self.winfo_screenwidth() - 80) / scale))
+        height = min(900, int((self.winfo_screenheight() - 140) / scale))
+        self.geometry(f'{width}x{height}+40+30')
         self.minsize(880, 620)
         self.configure(fg_color='#0b100d')
         self.font_name = 'VT323' if 'VT323' in tkfont.families(self) else 'Courier New'
@@ -41,6 +44,8 @@ class CityCollapseApp(ctk.CTk):
         self.render_generation, self.dirty = 0, True
         self.render_future, self.render_camera = None, None
         self.map_image, self.car_image, self.car_hits = None, None, []
+        self.car_camera = None
+        self.cars_dirty = True
         self.mode, self.width_field = MODES[0], 'RR_WIDTH_P'
         self.last_tick, self.last_vehicle_paint = time.perf_counter(), 0
         self.paint_after, self.frame_ms = 0, 33
@@ -78,7 +83,11 @@ class CityCollapseApp(ctk.CTk):
         self.canvas.bind('<MouseWheel>', lambda event: self.zoom(1 if event.delta > 0 else -1, event.x, event.y))
         self.canvas.bind('<Button-4>', lambda event: self.zoom(1, event.x, event.y))
         self.canvas.bind('<Button-5>', lambda event: self.zoom(-1, event.x, event.y))
-        self.panel = ctk.CTkFrame(self, width=272, fg_color=BG, corner_radius=2, border_width=1, border_color=BORDER)
+        self.canvas.bind('<Key-plus>', lambda event: self.zoom(1))
+        self.canvas.bind('<Key-minus>', lambda event: self.zoom(-1))
+        for key, dx, dy in [('Left', -100, 0), ('Right', 100, 0), ('Up', 0, -100), ('Down', 0, 100)]:
+            self.canvas.bind(f'<{key}>', lambda event, dx=dx, dy=dy: self.pan_keyboard(dx, dy))
+        self.panel = ctk.CTkScrollableFrame(self, width=252, height=650, fg_color=BG, corner_radius=2, border_width=1, border_color=BORDER, scrollbar_button_color=BORDER, scrollbar_button_hover_color='#567d60')
         self.panel.place(x=16, y=16)
         ctk.CTkLabel(self.panel, text='CITYCOLLAPSE_', font=ctk.CTkFont(self.font_name, 29), text_color=FG).pack(anchor='w', padx=15, pady=(10, 0))
         ctk.CTkLabel(self.panel, text='BENGALURU / EXPLORE', font=self.small_font, text_color='#7eaf87').pack(anchor='w', padx=15, pady=(0, 10))
@@ -136,12 +145,14 @@ class CityCollapseApp(ctk.CTk):
     def invalidate(self):
         self.render_generation += 1
         self.dirty = True
+        self.cars_dirty = True
         if not self.roads_var.get():
             self.hide_hover()
 
     def resize(self, event):
         if event.width > 0 and event.height > 0:
             self.camera = replace(self.camera, width=event.width, height=event.height)
+            self.panel.configure(height=max(250, (event.height - 100) / self.panel._get_widget_scaling()))
             self.invalidate()
 
     def reset_camera(self):
@@ -162,6 +173,11 @@ class CityCollapseApp(ctk.CTk):
         self.canvas.focus_set()
         self.drag_origin = event.x, event.y, self.camera
         self.dragged = False
+
+    def pan_keyboard(self, dx, dy):
+        self.camera = replace(self.camera, x=self.camera.x + dx / self.camera.scale, y=max(0, min(1, self.camera.y + dy / self.camera.scale)))
+        self.hide_hover()
+        self.invalidate()
 
     def drag(self, event):
         if not self.drag_origin:
@@ -219,6 +235,7 @@ class CityCollapseApp(ctk.CTk):
             self.play_button.configure(text='Play', state='normal')
             self.sim_status.configure(text=f'{count} cars initialized / paused\nStops at edge ends; no routing yet')
             self.last_vehicle_paint = 0
+            self.cars_dirty = True
         except ValueError as error:
             self.sim_status.configure(text=str(error))
 
@@ -312,6 +329,11 @@ class CityCollapseApp(ctk.CTk):
     def pick(self, x, y):
         if not self.datasets:
             return
+        if self.simulation and self.car_camera != self.camera:
+            # Camera input can arrive before the next paint tick. Never hit-test stale
+            # screen coordinates from the previous viewport.
+            self.car_hits = [(*self.camera.screen(project(*vehicle.position()[0])), vehicle) for vehicle in self.simulation.vehicles]
+            self.car_camera = self.camera
         car = min(self.car_hits, key=lambda item: (item[0] - x) ** 2 + (item[1] - y) ** 2, default=None)
         if car and (car[0] - x) ** 2 + (car[1] - y) ** 2 <= 225:
             vehicle = car[2]
@@ -388,16 +410,16 @@ class CityCollapseApp(ctk.CTk):
                 self.status.configure(text=f'Dataset loading failed: {error}')
                 self.facility_summary.configure(text='Local data could not load. Check data/ and restart.')
         if self.running and self.simulation:
-            # Pause elapsed-time accounting while hidden/minimized. Fixed substeps do not
-            # create a second loop; all work executes inside this single Tk callback.
+            # Pause while minimized; cap long stalls so resuming cannot teleport cars.
+            # Constant-speed motion needs just one backend call per screen tick.
             if self.state() != 'iconic':
-                remaining = min(dt, .25)
-                while remaining > 0:
-                    step = min(remaining, 1 / 60)
-                    self.simulation.get_next_state(step, self.speed_mps)
-                    remaining -= step
+                self.simulation.get_next_state(min(dt, .25), self.speed_mps)
                 stopped = sum(vehicle.stopped for vehicle in self.simulation.vehicles)
                 self.sim_status.configure(text=f'{len(self.simulation.vehicles)} cars / {self.simulation.elapsed_s:.1f}s\n{stopped} stopped at edge ends')
+                self.cars_dirty = True
+                if stopped == len(self.simulation.vehicles):
+                    self.running = False
+                    self.play_button.configure(text='Play')
         if self.tiles:
             if self.tiles.poll():
                 self.invalidate()
@@ -422,12 +444,14 @@ class CityCollapseApp(ctk.CTk):
             def render():
                 return generation, paint_map(*arguments)
             self.render_future = self.worker.submit(render)
-        if self.simulation and (self.running or now - self.last_vehicle_paint > .15):
+        if self.simulation and (self.running or self.cars_dirty):
             image, self.car_hits = paint_cars(self.camera, self.simulation.vehicles)
+            self.car_camera = self.camera
             self.car_image = ImageTk.PhotoImage(image, master=self)
             self.canvas.itemconfigure(self.car_item, image=self.car_image)
             self.canvas.coords(self.car_item, 0, 0)
             self.last_vehicle_paint = now
+            self.cars_dirty = False
         if self.datasets:
             failed = sum(key in self.tiles.failed for key in keys) if self.tiles else 0
             pending = sum(key not in self.tiles.images for key in keys) if self.tiles else 0

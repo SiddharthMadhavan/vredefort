@@ -52,6 +52,19 @@ def check():
             app.pick(x, y)
             assert app.pinned
             app.show_all()
+            hospital = app.datasets['hospitals'][0]
+            from dataclasses import replace
+            app.camera = replace(app.camera, x=hospital['point'][0], y=hospital['point'][1], zoom=16)
+            app.hospitals_var.set(True)
+            app.pick(app.camera.width / 2, app.camera.height / 2)
+            assert app.detail_title.cget('text') == hospital['Name']
+            app.show_all()
+            station = app.datasets['fire'][0]
+            app.camera = replace(app.camera, x=station['point'][0], y=station['point'][1])
+            app.fire_var.set(True)
+            app.pick(app.camera.width / 2, app.camera.height / 2)
+            assert app.detail_title.cget('text') == station['FIRE_STAName']
+            app.show_all()
             app.set_mode('OSM road graph')
             assert app.mode == 'OSM road graph'
             app.set_mode('KML width shading')
@@ -63,13 +76,17 @@ def check():
             app.after(6000, check)
         else:
             assert app.map_image is not None
+            app.show_all()
+            app.pinned = True  # Keep physical mouse hover from changing the QA screenshot.
             folder = Path('.tmp'); folder.mkdir(exist_ok=True)
             ImageGrab.grab(bbox=(app.winfo_rootx(), app.winfo_rooty(), app.winfo_rootx() + app.winfo_width(), app.winfo_rooty() + app.winfo_height())).save(folder / 'desktop-smoke.png')
-            print(f'GUI smoke passed: real Tk window, {len(app.tiles.images)} loaded map tiles, dataset switches, hover/pin, 30 moving cars and clean shutdown.', flush=True)
+            print(f'GUI smoke passed: real Tk window, {len(app.tiles.images)} loaded map tiles, dataset switches, node/hospital/fire details, 30 moving cars and clean shutdown.', flush=True)
             app.close()
     except Exception as error:
+        import traceback
+        traceback.print_exc()
         errors.append(error)
-        print('GUI smoke failed:', repr(error), flush=True)
+        print('GUI smoke failed:', stages, repr(error), flush=True)
         app.close()
 
 app.after(250, check)

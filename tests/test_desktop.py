@@ -4,8 +4,26 @@ from citycollapse.data import load_datasets, SpatialIndex
 from citycollapse.geometry import project, unproject, cumulative_lengths, position_along
 from citycollapse.map_renderer import Camera, width_style
 from citycollapse.simulation import Simulation
+from citycollapse.graph_builder import build_graph
 
 class GeometryTests(unittest.TestCase):
+    def test_graph_builder_junctions_chains_and_crossings(self):
+        a, b, c, d = [77.5, 12.9], [77.51, 12.9], [77.52, 12.9], [77.51, 12.91]
+        def feature(points, identifier):
+            return {'id': identifier, 'properties': {'id': str(identifier)}, 'geometry': {'type': 'LineString', 'coordinates': points}}
+        t = build_graph({'features': [feature([a, b, c], 1), feature([b, d], 2)]}, exact=True)
+        self.assertEqual(len(t['nodes']), 4)
+        self.assertEqual(len(t['edges']), 3)
+        self.assertEqual(sum(node['kind'] == 'junction_candidate' for node in t['nodes']), 1)
+        chain = build_graph({'features': [feature([a, b], 1), feature([b, c], 2)]})
+        self.assertEqual(len(chain['nodes']), 2)
+        self.assertEqual(len(chain['edges']), 1)
+        self.assertEqual(len(chain['edges'][0]['coordinates']), 3)
+        crossing = build_graph({'features': [feature([a, c], 1), feature([[77.51, 12.89], d], 2)]})
+        self.assertEqual(len(crossing['nodes']), 4)
+        loop = build_graph({'features': [feature([a, b, d, a], 1)]})
+        self.assertEqual(len(loop['nodes']), 1)
+        self.assertEqual(loop['nodes'][0]['degree'], 2)
     def test_mercator_and_camera_round_trip(self):
         point = (77.5946, 12.9716)
         actual = unproject(*project(*point))
