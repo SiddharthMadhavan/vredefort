@@ -95,6 +95,14 @@ bool loadRoadEdges(const std::string& filepath, std::vector<RoadEdge>& edges) {
     return true;
 }
 
+void get_next_state(double dt, std::vector<double>&dist) {
+    for(int i = 0; i < dist.size(); i++) {
+        dist[i] += dt*100;
+    }
+}
+
+
+
 int main() {
     std::vector<std::string> possible_paths = {
         "data/bengaluru-kml-road-edges.geojson",
