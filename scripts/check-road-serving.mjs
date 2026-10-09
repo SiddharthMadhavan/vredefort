@@ -33,9 +33,11 @@ try {
   assert.equal(nodesResponse.status, 200)
   const nodes = await nodesResponse.json()
   assert.equal(nodes.type, 'FeatureCollection')
-  assert.equal(nodes.features.length, 19283)
+  const expectedNodes = JSON.parse(await fs.readFile('data/bengaluru-road-nodes.geojson', 'utf8'))
+  assert.deepEqual(nodes, expectedNodes)
+  assert.ok(nodes.features.every(node => node.properties.kind !== 'continuation'))
   assert.ok(nodes.features.every(node => node.geometry.type === 'Point' && Number.isInteger(node.properties.number) && Number.isInteger(node.properties.degree)))
-  console.log('Development node dataset loads with 19,283 numbered graph points.')
+  console.log(`Development node dataset loads with ${nodes.features.length} graph points and no continuations.`)
 } finally {
   await server.close()
 }

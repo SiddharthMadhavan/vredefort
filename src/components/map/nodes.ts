@@ -4,7 +4,7 @@ import nodesUrl from '../../../data/bengaluru-road-nodes.geojson?url'
 export const NODE_SOURCE_ID = 'road-graph-nodes'
 const HIT_LAYER_ID = 'road-graph-node-hit-area'
 type GraphNode = { id: string; number: number; kind: string; degree: number; coordinates: [number, number] }
-const kindLabels: Record<string, string> = { junction_candidate: 'Junction candidate', endpoint: 'Road endpoint', continuation: 'Road continuation', loop_anchor: 'Loop anchor' }
+const kindLabels: Record<string, string> = { junction_candidate: 'Junction candidate', endpoint: 'Road endpoint', loop_anchor: 'Loop anchor' }
 
 function readNode(feature: MapGeoJSONFeature): GraphNode | null {
   if (feature.geometry.type !== 'Point') return null
