@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, CancelledError
 import ctypes
 from dataclasses import replace
 import sys
@@ -6,14 +6,18 @@ import time
 import tkinter as tk
 from tkinter import font as tkfont
 import webbrowser
+from queue import Queue, Empty
+from threading import Thread
 
 import customtkinter as ctk
 from PIL import ImageTk
 
-from .config import settings
+from .config import settings, analyst_settings
 from .geometry import project
 from .map_renderer import Camera, FONT_FILE, TileCache
 from .explore_map import load_network, nearest_node, nearest_road, paint_explore
+from .live_traffic import LiveTrafficAnalyst, AnalysisCancel, sample_road
+from .analyst_panel import AnalystPanel
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -37,6 +41,13 @@ class CityCollapseApp(ctk.CTk):
         self.font = ctk.CTkFont(self.font_name, 20)
         self.small_font = ctk.CTkFont(self.font_name, 17)
         self.closed = False
+        self.agent_events = Queue()
+        self.agent_cancel = AnalysisCancel()
+        self.agent_thread = None
+        self.agent_generation = 0
+        self.agent_busy = False
+        self.agent_target = None
+        self.agent_factory = LiveTrafficAnalyst
         self.network = self.selection = self.drag_origin = None
         self.dragged = False
         self.camera = Camera(*CENTRE, 11, width, height)
@@ -56,6 +67,8 @@ class CityCollapseApp(ctk.CTk):
             self.configuration_error = str(error)
         self._build_widgets()
         self.bind('<Escape>', lambda event: self.clear_selection())
+        self.bind('<Return>', self.analyze_selected)
+        self.bind('<KP_Enter>', self.analyze_selected)
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after_id = self.after(33, self.tick)
 
@@ -66,7 +79,9 @@ class CityCollapseApp(ctk.CTk):
             border_color=BORDER, corner_radius=3, height=32, **kwargs)
 
     def _build_widgets(self):
-        self.canvas = tk.Canvas(self, background=BG, highlightthickness=0, cursor='fleur')
+        self.map_area = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
+        self.map_area.place(x=0, y=0, relwidth=1, relheight=1)
+        self.canvas = tk.Canvas(self.map_area, background=BG, highlightthickness=0, cursor='fleur')
         self.canvas.pack(fill='both', expand=True)
         self.base_item = self.canvas.create_image(0, 0, anchor='nw')
         self.hover_item = self.canvas.create_oval(
@@ -88,7 +103,7 @@ class CityCollapseApp(ctk.CTk):
                             ('Up', 0, -100), ('Down', 0, 100)]:
             self.canvas.bind(f'<{key}>', lambda event, dx=dx, dy=dy: self.pan_keyboard(dx, dy))
         self.details = ctk.CTkFrame(
-            self, width=300, fg_color=BG, border_width=1,
+            self.map_area, width=300, fg_color=BG, border_width=1,
             border_color=BORDER, corner_radius=4)
         self.details.place(x=16, y=16)
         ctk.CTkLabel(self.details, text='CITYCOLLAPSE_', text_color=FG,
@@ -111,7 +126,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_button.pack(padx=16, pady=(0, 12))
         self.show_hint()
         self.controls = ctk.CTkFrame(
-            self, fg_color=BG, corner_radius=4, border_width=1, border_color=BORDER)
+            self.map_area, fg_color=BG, corner_radius=4, border_width=1, border_color=BORDER)
         self.controls.place(relx=1, x=-16, y=16, anchor='ne')
         self.zoom_in_button = self.button(self.controls, '+', lambda: self.zoom(1), width=38)
         self.zoom_out_button = self.button(self.controls, '-', lambda: self.zoom(-1), width=38)
@@ -122,15 +137,16 @@ class CityCollapseApp(ctk.CTk):
         self.button(self.controls, 'Retry map', self.retry_tiles, width=88).pack(
             side='left', padx=3, pady=5)
         self.status = ctk.CTkLabel(
-            self, text='Loading roads...', font=self.small_font, fg_color=BG,
+            self.map_area, text='Loading roads...', font=self.small_font, fg_color=BG,
             text_color='#9bbca1', corner_radius=2, wraplength=420, justify='left')
         self.status.place(x=16, rely=1, y=-12, anchor='sw')
         self.attribution = ctk.CTkLabel(
-            self, text=self.config_values['attribution'], fg_color=BG,
+            self.map_area, text=self.config_values['attribution'], fg_color=BG,
             font=ctk.CTkFont(self.font_name, 15), text_color='#819487', cursor='hand2')
         self.attribution.place(relx=1, rely=1, x=-16, y=-12, anchor='se')
         self.attribution.bind('<Button-1>', lambda event: webbrowser.open(
             'https://www.openstreetmap.org/copyright'))
+        self.analyst_panel = AnalystPanel(self, self.font, self.small_font, self.close_analyst)
 
     def clear_body(self):
         for widget in self.detail_body.winfo_children():
@@ -147,6 +163,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
+        self.detail_text('Select a road, then press Enter for the Live Traffic Analyst.', True)
 
     def select_road(self, identifier):
         network = self.network
@@ -155,6 +172,7 @@ class CityCollapseApp(ctk.CTk):
         road = network.roads_by_id[identifier]
         p = road.properties
         self.selection = ('road', identifier)
+        self.selection_changed()
         self.detail_title.configure(text='ROAD / EDGE')
         self.clear_body()
         self.detail_text(f'ID\n{identifier}\n\nLength\n{p["length_m"]:,.1f} m')
@@ -167,6 +185,8 @@ class CityCollapseApp(ctk.CTk):
                         lambda node_id=node_id: self.select_node(node_id),
                         width=250).pack(padx=4, pady=4)
         self.detail_text('Source: existing KML road graph.\nConnectivity inferred from dataset coordinates.', True)
+        self.button(self.detail_body, 'Analyze traffic [Enter]', self.analyze_selected,
+                    width=250).pack(padx=4, pady=6)
         self.clear_button.configure(state='normal')
         self.invalidate()
 
@@ -176,6 +196,7 @@ class CityCollapseApp(ctk.CTk):
             return
         node = network.nodes_by_id[identifier]
         self.selection = ('node', identifier)
+        self.selection_changed()
         self.detail_title.configure(text=f'NODE {node["number"]}')
         self.clear_body()
         lon, lat = node['coordinate']
@@ -197,11 +218,122 @@ class CityCollapseApp(ctk.CTk):
 
     def clear_selection(self):
         self.selection = None
+        self.selection_changed()
         self.hide_hover()
         self.detail_title.configure(text='Select a road or node')
         self.show_hint()
         self.clear_button.configure(state='disabled')
         self.invalidate()
+
+    def selection_changed(self):
+        if self.agent_target and self.selection != ('road', self.agent_target):
+            self.agent_cancel.set()
+            self.agent_generation += 1
+            self.agent_busy = False
+            self.agent_target = None
+            self.analyst_panel.set_status('Selection changed / select a road and press Enter')
+
+    def analyze_selected(self, event=None):
+        if self.network is None or not self.selection or self.selection[0] != 'road':
+            self.status.configure(text='Select a road, then press Enter to analyze traffic.')
+            return 'break'
+        if self.agent_thread and self.agent_thread.is_alive():
+            self.analyst_panel.set_status('Analysis in progress; a cancelled request may take a moment to stop.')
+            return 'break'
+        road_id = self.selection[1]
+        self.agent_generation += 1
+        generation = self.agent_generation
+        self.agent_cancel = AnalysisCancel()
+        cancel = self.agent_cancel
+        self.agent_target = road_id
+        self.agent_busy = True
+        was_open = bool(self.analyst_panel.place_info())
+        self.map_area.place_configure(relwidth=.5)
+        self.analyst_panel.place(relx=.5, rely=0, relwidth=.5, relheight=1)
+        for button in self.controls.winfo_children():
+            button.pack_configure(side='top', fill='x')
+        self.controls.place_configure(relx=1, rely=1, x=-16, y=-106, anchor='se')
+        self.status.place_configure(y=-66)
+        if not was_open:
+            self.after(100, self.focus_analyzed_road)
+        try:
+            config = analyst_settings()
+        except ValueError as error:
+            self.agent_busy = False
+            self.analyst_panel.begin(road_id, 'configuration error')
+            self.analyst_panel.set_status(str(error), error=True)
+            return 'break'
+        self.analyst_panel.begin(road_id, config['model'])
+        network, factory, events = self.network, self.agent_factory, self.agent_events
+
+        def emit(kind, value):
+            if not cancel.is_set():
+                events.put((generation, kind, value))
+
+        def run():
+            try:
+                factory(config).analyze(network, road_id, cancel, emit)
+            except CancelledError:
+                pass
+            except Exception as error:
+                # Only controlled errors reach the UI; never display provider URLs/keys.
+                message = str(error) if isinstance(error, ValueError) else 'Analysis failed. Check traffic configuration and Ollama, then retry.'
+                emit('error', message)
+            finally:
+                emit('finished', None)
+
+        self.agent_thread = Thread(target=run, daemon=True, name='live-traffic-analyst')
+        self.agent_thread.start()
+        return 'break'
+
+    def focus_analyzed_road(self):
+        if self.closed or not self.agent_target or not self.network:
+            return
+        coordinate, _ = sample_road(self.network.roads_by_id[self.agent_target])
+        point = project(*coordinate)
+        panel_right = self.details.winfo_x() + self.details.winfo_width() + 12
+        x = (min(panel_right, self.camera.width - 40) + self.camera.width) / 2
+        self.camera = replace(self.camera, x=point[0] - (x - self.camera.width / 2) / self.camera.scale,
+                              y=point[1])
+        self.invalidate()
+
+    def close_analyst(self):
+        self.agent_cancel.set()
+        self.agent_generation += 1
+        self.agent_busy = False
+        self.agent_target = None
+        self.analyst_panel.place_forget()
+        self.map_area.place_configure(relwidth=1)
+        for button in self.controls.winfo_children():
+            button.pack_configure(side='left', fill='none')
+        self.controls.place_configure(relx=1, rely=0, x=-16, y=16, anchor='ne')
+        self.status.place_configure(y=-12)
+
+    def poll_analyst(self):
+        tokens = []
+        for _ in range(200):
+            try:
+                generation, kind, value = self.agent_events.get_nowait()
+            except Empty:
+                break
+            if generation != self.agent_generation or not self.agent_target:
+                continue
+            if kind == 'token':
+                tokens.append(value)
+            elif kind == 'status':
+                self.analyst_panel.set_status(value)
+            elif kind == 'evidence':
+                self.analyst_panel.set_evidence(value)
+            elif kind == 'error':
+                self.analyst_panel.set_status(value, error=True)
+                self.agent_busy = False
+                tokens.append('\n\n' + value)
+            elif kind in ('done', 'finished'):
+                self.agent_busy = False
+                if kind == 'done':
+                    self.analyst_panel.set_status(value)
+        if tokens:
+            self.analyst_panel.append(''.join(tokens))
 
     def pick(self, x, y):
         if self.network is None:
@@ -244,6 +376,9 @@ class CityCollapseApp(ctk.CTk):
             self.camera = replace(self.camera, width=event.width, height=event.height)
             scaling = self.details._get_widget_scaling()
             self.detail_body.configure(height=max(150, min(350, event.height / scaling - 260)))
+            attribution_width = min(560, max(150, event.width / scaling - 32))
+            self.attribution.configure(width=attribution_width, height=48,
+                                       wraplength=attribution_width)
             self.invalidate()
 
     def reset_camera(self):
@@ -326,6 +461,7 @@ class CityCollapseApp(ctk.CTk):
         if self.closed:
             return
         now = time.perf_counter()
+        self.poll_analyst()
         if self.data_future and self.data_future.done():
             future, self.data_future = self.data_future, None
             try:
@@ -383,6 +519,7 @@ class CityCollapseApp(ctk.CTk):
         if self.closed:
             return
         self.closed = True
+        self.agent_cancel.set()
         self.after_cancel(self.after_id)
         if self.tiles:
             self.tiles.close()
