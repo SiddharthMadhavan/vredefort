@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Map, AttributionControl } from 'maplibre-gl'
 import { BENGALURU, INITIAL_ZOOM, KEY_FREE_MAP_STYLE, configurationError, mapRequest, mapStyle } from '../../config/map'
 import { addRoadOverlay, ROAD_LAYER_ID, ROAD_SOURCE_ID } from './roads'
+import { addNodeInteractions, NODE_SOURCE_ID } from './nodes'
 
 type Status = 'loading' | 'ready' | 'error'
 export default function CityMap() {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
+  const nodeInteractions = useRef<ReturnType<typeof addNodeInteractions> | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [attempt, setAttempt] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
@@ -14,6 +16,7 @@ export default function CityMap() {
   const [keyFree, setKeyFree] = useState(false)
   const [roadsReady, setRoadsReady] = useState(false)
   const [roadsVisible, setRoadsVisible] = useState(true)
+  const [nodesError, setNodesError] = useState(false)
   useEffect(() => {
     if (!container.current) return
     setStatus('loading')
@@ -21,6 +24,7 @@ export default function CityMap() {
     setRoadsError(false)
     setRoadsReady(false)
     setRoadsVisible(true)
+    setNodesError(false)
     if (configurationError && !keyFree) {
       setErrorMessage(configurationError)
       setStatus('error')
@@ -50,10 +54,13 @@ export default function CityMap() {
           if (instance) {
             roadsTimeout = setTimeout(() => setRoadsError(true), 20000)
             addRoadOverlay(instance)
+            try { nodeInteractions.current = addNodeInteractions(instance, () => setNodesError(false), () => setNodesError(true)) }
+            catch { setNodesError(true) }
           }
         } catch { clearTimeout(roadsTimeout); setRoadsError(true) }
       })
       instance.on('error', (event) => {
+        if ('sourceId' in event && event.sourceId === NODE_SOURCE_ID) { setNodesError(true); return }
         if ('sourceId' in event && event.sourceId === ROAD_SOURCE_ID) { clearTimeout(roadsTimeout); setRoadsError(true); return }
         const { error } = event
         clearTimeout(timeout)
@@ -65,12 +72,13 @@ export default function CityMap() {
       observer = new ResizeObserver(() => instance?.resize())
       observer.observe(container.current)
     } catch { setErrorMessage('The map could not start. Check that WebGL is enabled in your browser.'); setStatus('error') }
-    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); instance?.remove(); mapRef.current = null }
+    return () => { clearTimeout(timeout); clearTimeout(roadsTimeout); observer?.disconnect(); nodeInteractions.current?.dispose(); nodeInteractions.current = null; instance?.remove(); mapRef.current = null }
   }, [attempt, keyFree])
   const toggleRoads = () => {
     const map = mapRef.current
     if (!map?.getLayer(ROAD_LAYER_ID)) return
     map.setLayoutProperty(ROAD_LAYER_ID, 'visibility', roadsVisible ? 'none' : 'visible')
+    nodeInteractions.current?.setVisible(!roadsVisible)
     setRoadsVisible(!roadsVisible)
   }
   return <>
@@ -78,5 +86,6 @@ export default function CityMap() {
     {!roadsError && <button className="roads-toggle" disabled={!roadsReady} aria-pressed={roadsVisible} onClick={toggleRoads} title="Show or hide the real OpenStreetMap major-road dataset"><span className={roadsVisible ? 'roads-swatch' : 'roads-swatch roads-swatch-off'} aria-hidden="true"/>{roadsReady ? `Roads ${roadsVisible ? 'on' : 'off'}` : 'Loading roads…'}</button>}
     {status !== 'ready' && <div className="map-status" role={status === 'error' ? 'alert' : 'status'}>{status === 'loading' ? 'Loading map…' : <>{errorMessage} <button onClick={() => setAttempt(attempt + 1)}>Retry</button>{!keyFree && <button onClick={() => setKeyFree(true)}>Use key-free basemap</button>}</>}</div>}
     {roadsError && <div className="roads-error" role="alert">Road overlay could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
+    {nodesError && <div className="nodes-error" role="alert">Node details could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
   </>
 }

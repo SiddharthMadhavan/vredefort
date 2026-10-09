@@ -23,6 +23,19 @@ try {
   assert.equal(worker.status, 200)
   assert.match(worker.headers.get('content-type'), /javascript/)
   console.log('Development MapLibre worker URL resolves to JavaScript (HTTP 200).')
+  const nodesModule = await fetch(`${origin}/src/components/map/nodes.ts`).then(r => r.text())
+  const nodesImport = nodesModule.match(/from\s+["']([^"']+bengaluru-road-nodes[^"']+)["']/)?.[1]
+  assert.ok(nodesImport, 'Node interaction must import the generated graph nodes')
+  const nodesWrapper = await fetch(new URL(nodesImport, origin)).then(r => r.text())
+  const nodesUrl = nodesWrapper.match(/export default\s+["']([^"']+)["']/)?.[1]
+  assert.ok(nodesUrl, 'Vite must generate a graph node asset URL')
+  const nodesResponse = await fetch(new URL(nodesUrl, origin))
+  assert.equal(nodesResponse.status, 200)
+  const nodes = await nodesResponse.json()
+  assert.equal(nodes.type, 'FeatureCollection')
+  assert.equal(nodes.features.length, 19283)
+  assert.ok(nodes.features.every(node => node.geometry.type === 'Point' && Number.isInteger(node.properties.number) && Number.isInteger(node.properties.degree)))
+  console.log('Development node dataset loads with 19,283 numbered graph points.')
 } finally {
   await server.close()
 }
@@ -40,6 +53,14 @@ try {
   assert.ok(source.length > 100000)
   assert.ok(!source.includes('maplibre-gl-shared.mjs'), 'Bundled worker must not reference a missing sibling module')
   console.log('Production MapLibre worker is bundled and served correctly (HTTP 200).')
+  const nodesFile = files.find(file => /^bengaluru-road-nodes-.*\.geojson$/.test(file))
+  assert.ok(nodesFile, 'Production must contain the generated graph node asset')
+  const nodesResponse = await fetch(`http://127.0.0.1:${address.port}/assets/${nodesFile}`)
+  assert.equal(nodesResponse.status, 200)
+  const nodes = await nodesResponse.json()
+  const original = JSON.parse(await fs.readFile('data/bengaluru-road-nodes.geojson', 'utf8'))
+  assert.deepEqual(nodes, original)
+  console.log('Production node dataset is bundled and matches the stored road graph.')
 } finally {
   await new Promise(resolve => built.httpServer.close(resolve))
 }

@@ -17,3 +17,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid #a497f8; outline-offs
 .roads-toggle:disabled { color: #99939f; cursor: wait; }
 .roads-swatch { width: 18px; height: 3px; border-radius: 2px; background: #c4a7ff; }
 .roads-swatch-off { background: #696471; }
+.graph-node-marker { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; border-radius: 50%; }
+.graph-node-marker::after { content: ''; width: 10px; height: 10px; border: 2px solid #f4eaff; border-radius: 50%; background: #ae80f5; box-shadow: 0 0 0 3px #16161cbf; }
+.graph-node-marker:hover::after { background: #d7bdff; }
+.node-popup .maplibregl-popup-content { padding: 18px; background: #19171f; color: #e4dbf6; border: 1px solid #453851; border-radius: 10px; box-shadow: 0 6px 24px #0005; }
+.node-popup .maplibregl-popup-tip { border-top-color: #19171f; border-bottom-color: #19171f; }
+.node-popup .maplibregl-popup-close-button { color: #c2b3d1; padding: 4px 8px; font-size: 18px; border-radius: 4px; }
+.node-details h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.node-kind { color: #bba0dc; font-size: 11px; margin: 4px 0 14px; }
+.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; margin: 0; font-size: 11px; }
+.node-details dt { color: #9990a7; }
+.node-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.node-note { font-size: 10px; color: #9990a7; line-height: 1.5; margin: 13px 0 0; }
+.nodes-error { position: absolute; top: 60px; left: 12px; padding: 10px 12px; background: #19171f; border-radius: 8px; font-size: 12px; }
+.nodes-error button { color: #c7b8ff; background: none; border: 0; text-decoration: underline; cursor: pointer; }
