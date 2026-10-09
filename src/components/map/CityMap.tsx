@@ -72,14 +72,13 @@ export default function CityMap() {
           if (instance) {
             roadsTimeout = setTimeout(() => setRoadsError(true), 20000)
             addRoadOverlay(instance)
-            try { nodeInteractions.current = addNodeInteractions(instance, () => setNodesError(false), () => setNodesError(true)) }
+            try { nodeInteractions.current = addNodeInteractions(instance, () => setNodesError(false), () => setNodesError(true), kmlNodesUrl) }
             catch { setNodesError(true) }
             edgeInteractions.current = addEdgeInteractions(instance, edge => {
               setEdgeSelected(!!edge)
               nodeInteractions.current?.setEdgeEndpoints(edge ? [edge.source, edge.target] : null)
             })
             edgeInteractions.current.setVisible(false)
-            nodeInteractions.current?.setVisible(false)
             try { widthOverlay.current = addWidthOverlay(instance, () => { setWidthReady(true); setWidthError(false) }, () => setWidthError(true), setWidthSelected) }
             catch { setWidthError(true) }
           }
@@ -105,7 +104,7 @@ export default function CityMap() {
     const map = mapRef.current
     if (!map?.getLayer(ROAD_LAYER_ID)) return
     edgeInteractions.current?.setVisible(!roadsVisible && !widthMode)
-    nodeInteractions.current?.setVisible(!roadsVisible && !widthMode)
+    nodeInteractions.current?.setVisible(!roadsVisible)
     widthOverlay.current?.setVisible(!roadsVisible && widthMode)
     setRoadsVisible(!roadsVisible)
   }
@@ -119,9 +118,11 @@ export default function CityMap() {
       source?.setData(kml ? kmlEdgesUrl : osmEdgesUrl)
       nodeInteractions.current?.setDataset(kml ? kmlNodesUrl : osmNodesUrl)
       setGraphDataset(kml ? 'kml' : 'osm')
+    } else {
+      nodeInteractions.current?.setDataset(kmlNodesUrl)
     }
     edgeInteractions.current?.setVisible(!value && roadsVisible)
-    nodeInteractions.current?.setVisible(!value && roadsVisible)
+    nodeInteractions.current?.setVisible(roadsVisible)
     widthOverlay.current?.setVisible(value && roadsVisible)
     setWidthMode(value)
   }
@@ -136,7 +137,7 @@ export default function CityMap() {
     </div>
     {status !== 'ready' && <div className="map-status" role={status === 'error' ? 'alert' : 'status'}>{status === 'loading' ? 'Loading map…' : <>{errorMessage} <button onClick={() => setAttempt(attempt + 1)}>Retry</button>{!keyFree && <button onClick={() => setKeyFree(true)}>Use key-free basemap</button>}</>}</div>}
     {roadsError && !widthMode && <div className="roads-error" role="alert">Road overlay could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
-    {nodesError && !widthMode && <div className="nodes-error" role="alert">Node details could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
+    {nodesError && <div className="nodes-error" role="alert">Node details could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
     {widthError && widthMode && <div className="nodes-error" role="alert">Road widths could not load. <button onClick={() => setAttempt(attempt + 1)}>Retry</button></div>}
   </>
 }

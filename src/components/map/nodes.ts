@@ -40,7 +40,7 @@ function details(node: GraphNode) {
   return content
 }
 
-export function addNodeInteractions(map: Map, onReady: () => void, onError: () => void) {
+export function addNodeInteractions(map: Map, onReady: () => void, onError: () => void, initialDataset = nodesUrl) {
   let active: GraphNode | null = null
   let marker: Marker | null = null
   let popup: Popup | null = null
@@ -117,7 +117,7 @@ export function addNodeInteractions(map: Map, onReady: () => void, onError: () =
     }
   }
   map.on('sourcedata', loaded)
-  map.addSource(NODE_SOURCE_ID, { type: 'geojson', data: nodesUrl })
+  map.addSource(NODE_SOURCE_ID, { type: 'geojson', data: initialDataset })
   // A nearly transparent hit layer allows discovery without displaying
   // thousands of permanent dots. Only the nearest hovered node gets a marker.
   map.addLayer({ id: HIT_LAYER_ID, type: 'circle', source: NODE_SOURCE_ID, paint: { 'circle-radius': 12, 'circle-color': '#c4a7ff', 'circle-opacity': 0.001 } })
