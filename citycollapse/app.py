@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor, CancelledError
 import ctypes
 from dataclasses import replace
+import math
 import sys
 import time
 from threading import Event
@@ -16,6 +17,8 @@ from .geometry import project, line_distance_squared
 from .map_renderer import Camera, FONT_FILE, TileCache, paint_map, TrafficPainter
 from .traffic import TrafficDataset, TrafficModel
 from .traffic_animation import FlowLayer
+from .impacts import build_impact_report
+from .impact_panel import ImpactPanel
 
 BG = '#0c1510'
 FG = '#abd2ad'
@@ -56,6 +59,7 @@ class CityCollapseApp(ctk.CTk):
         self.map_image, self.traffic_image = None, None
         self.traffic_result, self.traffic_future, self.traffic_paint_future = None, None, None
         self.traffic_cancel_event = None
+        self.impact_report, self.active_diversion, self.impact_auto_key = None, None, None
         self.requested_key, self.result_key, self.failed_key = None, None, None
         self.blocked_edges, self.blocked_nodes = set(), set()
         self.action_target = None
@@ -152,6 +156,12 @@ class CityCollapseApp(ctk.CTk):
         ctk.CTkCheckBox(self.traffic_controls, text='Animate traffic flow', variable=self.flow_var, command=self.toggle_flow, font=self.font, text_color=FG, checkbox_width=16, checkbox_height=16, corner_radius=1, fg_color='#527c5a', border_color=BORDER).pack(anchor='w', padx=15, pady=6)
         self.closure_summary = ctk.CTkLabel(self.traffic_controls, text='0 roads / 0 junctions blocked', font=self.small_font, text_color='#e1b28b', wraplength=240, justify='left')
         self.closure_summary.pack(anchor='w', padx=15, pady=4)
+        self.impact_on = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(self.traffic_controls, text='Show closure highlights', variable=self.impact_on, command=self.invalidate,
+                       font=self.font, text_color=FG, checkbox_width=16, checkbox_height=16, corner_radius=1,
+                       fg_color='#527c5a', border_color=BORDER).pack(anchor='w', padx=15, pady=4)
+        self.impact_button = self.button(self.traffic_controls, 'Affected roads + diversions', self.show_impacts, width=242, state='disabled')
+        self.impact_button.pack(padx=15, pady=4)
         self.button(self.traffic_controls, 'Clear all blocks', self.clear_blocks, width=242).pack(padx=15, pady=4)
         self.button(self.traffic_controls, 'Model + assumptions', self.show_model, width=242).pack(padx=15, pady=4)
         self.sim_status = ctk.CTkLabel(self.traffic_controls, text='Loading synthetic traffic...', font=self.small_font, text_color='#819487', wraplength=240, justify='left')
@@ -172,8 +182,12 @@ class CityCollapseApp(ctk.CTk):
         self.detail_body.pack(anchor='w', padx=16, pady=5)
         self.detail_link = self.button(self.details, 'Hospital search reference ↗', self.open_reference, width=288)
         self.block_button = self.button(self.details, 'Block road', self.toggle_block_target, width=288)
+        self.detail_impact_button = self.button(self.details, 'Back to closure impacts', self.show_impacts, width=288)
         self.button(self.details, 'Close / show all', self.show_all, width=288).pack(padx=16, pady=(6, 12))
         self.reference_url = ''
+        self.impact_panel = ImpactPanel(self, self.font, self.small_font,
+                                       self.inspect_affected_road, self.inspect_affected_facility,
+                                       self.preview_diversion, self.focus_impacts, self.close_impacts)
 
     def invalidate(self, traffic=True):
         self.render_generation += 1
@@ -187,6 +201,8 @@ class CityCollapseApp(ctk.CTk):
         if event.width > 0 and event.height > 0:
             self.camera = replace(self.camera, width=event.width, height=event.height)
             self.panel.configure(height=max(250, (event.height - 100) / self.panel._get_widget_scaling()))
+            if hasattr(self, 'impact_panel'):
+                self.impact_panel.resize_body((event.height - 460) / self.impact_panel._get_widget_scaling())
             self.invalidate()
 
     def reset_camera(self):
@@ -367,6 +383,87 @@ class CityCollapseApp(ctk.CTk):
         self.request_traffic()
         self.set_action(kind, identifier)
 
+    def solve_scenario(self, hour, blocked_edges, blocked_nodes, cancel_event=None):
+        result = self.traffic_model.solve(hour, blocked_edges, blocked_nodes, cancel_event=cancel_event)
+        report = build_impact_report(self.traffic_model, result, self.datasets, blocked_edges, cancel_event)
+        return result, report
+
+    def show_impacts(self):
+        if not self.impact_report or not self.impact_report.closed_roads:
+            return
+        self.details.place_forget()
+        self.pinned = True
+        self.impact_panel.set_report(self.impact_report, self.traffic_result)
+        self.impact_panel.resize_body((self.camera.height - 460) / self.impact_panel._get_widget_scaling())
+        self.impact_panel.place(relx=1, x=-16, y=78, anchor='ne')
+        if not self.impact_on.get():
+            self.impact_on.set(True)
+            self.invalidate()
+
+    def close_impacts(self):
+        self.impact_panel.place_forget()
+        self.pinned = False
+
+    def inspect_affected_road(self, identifier):
+        self.set_mode('Traffic simulation')
+        self.selected, self.pinned = identifier, True
+        self.show_traffic_edge(identifier)
+        self.set_action('edge', identifier)
+        self.focus_roads({identifier})
+
+    def inspect_affected_facility(self, facility):
+        point = self.datasets[facility.kind][facility.index]
+        self.camera = replace(self.camera, x=point['point'][0], y=point['point'][1], zoom=16)
+        self.show_all()
+        self.pinned = True
+        rows = [('Type', 'Hospital' if facility.kind == 'hospitals' else 'Fire station'),
+                ('Address', point.get('Address')), ('Distance to affected road', f'{facility.distance_m:.0f} m'),
+                ('Affected roads nearby', len(facility.road_ids)),
+                ('Nearest road', facility.road_ids[0])]
+        self.show_details(facility.name, rows,
+                          f'Within the {self.impact_report.radius_m:g}m proximity buffer. Potential access delay; no outage or emergency response time is inferred.\n'
+                          + ('Coordinates: inferred OSM match; needs verification.' if point.get('match_status') == 'inferred_facility_match' else 'Coordinates retain their original dataset provenance.'),
+                          point.get('search_url', ''))
+        self.invalidate()
+
+    def preview_diversion(self, option):
+        self.active_diversion = option
+        self.impact_on.set(True)
+        self.focus_roads(set(option.route.edge_ids))
+        self.invalidate()
+        self.impact_panel.note.configure(text=f'Preview: {option.route.length_m / 1000:.2f} km / {option.route.travel_time_s / 60:.1f} min. '
+                                              'This graph route does not change the traffic assignment.')
+
+    def focus_roads(self, identifiers, facilities=()):
+        if not self.datasets or not identifiers:
+            return
+        view = self.datasets['views']['KML road graph']
+        bounds = [view['by_id'][key].bounds for key in identifiers if key in view['by_id']]
+        for facility in facilities:
+            point = self.datasets[facility.kind][facility.index]['point']
+            bounds.append((*point, *point))
+        if not bounds:
+            return
+        left, top = min(b[0] for b in bounds), min(b[1] for b in bounds)
+        right, bottom = max(b[2] for b in bounds), max(b[3] for b in bounds)
+        scale = self._get_window_scaling()
+        margin_left = 300 * scale if self.panel.winfo_ismapped() else 30
+        margin_right = 390 * scale
+        usable_w, usable_h = max(150, self.camera.width - margin_left - margin_right), max(150, self.camera.height - 160)
+        pixels = min(usable_w / max(right - left, 1e-8), usable_h / max(bottom - top, 1e-8)) * .88
+        zoom = max(8, min(17, math.floor(math.log2(pixels / 256))))
+        camera = replace(self.camera, zoom=zoom)
+        desired_x = margin_left + usable_w / 2
+        self.camera = replace(camera, x=(left + right) / 2 - (desired_x - camera.width / 2) / camera.scale,
+                              y=(top + bottom) / 2)
+        self.invalidate()
+
+    def focus_impacts(self):
+        if self.impact_report:
+            identifiers = set(self.impact_report.affected_roads)
+            identifiers.update(edge for option in self.impact_report.diversions for edge in option.route.edge_ids)
+            self.focus_roads(identifiers, self.impact_report.facilities)
+
     def show_model(self):
         self.pinned = True
         self.show_details('Synthetic traffic model', [],
@@ -378,8 +475,13 @@ class CityCollapseApp(ctk.CTk):
             'Full math: data/traffic-model.txt')
 
     def show_details(self, title, rows, note='', link=''):
+        self.impact_panel.place_forget()
         self.action_target = None
         self.block_button.pack_forget()
+        if self.impact_report and self.impact_report.closed_roads:
+            self.detail_impact_button.pack(padx=16, pady=5, before=self.details.winfo_children()[-1])
+        else:
+            self.detail_impact_button.pack_forget()
         self.detail_title.configure(text=str(title))
         self.detail_body.configure(text='\n'.join(f'{label}: {value if value not in (None, "") else "Not provided"}' for label, value in rows) + ('\n\n' + note if note else ''))
         self.reference_url = link
@@ -444,11 +546,18 @@ class CityCollapseApp(ctk.CTk):
         if not self.datasets:
             return
         for kind, enabled in [('hospitals', self.hospitals_var.get()), ('fire', self.fire_var.get())]:
-            if not enabled:
+            flagged = {f.index for f in self.impact_report.facilities if f.kind == kind} if self.impact_report and self.impact_on.get() and self.mode == 'Traffic simulation' else set()
+            if not enabled and not flagged:
                 continue
-            for point in self.datasets[kind]:
+            for index, point in enumerate(self.datasets[kind]):
+                if not enabled and index not in flagged:
+                    continue
                 sx, sy = self.camera.screen(point['point'])
                 if abs(sx - x) <= 12 and abs(sy - y) <= 12:
+                    if index in flagged:
+                        facility = next(f for f in self.impact_report.facilities if f.kind == kind and f.index == index)
+                        self.inspect_affected_facility(facility)
+                        return
                     self.pinned = True
                     if kind == 'hospitals':
                         note = 'User-provided coordinates; not independently verified.' if point['match_status'] == 'provided_coordinates' else 'Inferred OSM facility match; requires verification.'
@@ -508,9 +617,11 @@ class CityCollapseApp(ctk.CTk):
 
     def show_all(self):
         self.selected, self.pinned = None, False
+        self.active_diversion = None
         self.action_target = None
         self.hide_hover()
         self.details.place_forget()
+        self.impact_panel.place_forget()
         self.invalidate()
 
     def tick(self):
@@ -543,16 +654,38 @@ class CityCollapseApp(ctk.CTk):
             key, future = self.traffic_future
             self.traffic_future = None
             try:
-                result = future.result()
+                result, report = future.result()
                 if key == self.requested_key:
+                    impact_was_visible = bool(self.impact_panel.place_info())
                     self.traffic_result, self.result_key = result, key
+                    self.impact_report = report
+                    if self.active_diversion and not any(d.closure_id == self.active_diversion.closure_id and d.route.edge_ids == self.active_diversion.route.edge_ids for d in report.diversions):
+                        self.active_diversion = None
+                    elif self.active_diversion:
+                        self.active_diversion = next(d for d in report.diversions if d.closure_id == self.active_diversion.closure_id and d.route.edge_ids == self.active_diversion.route.edge_ids)
                     self.failed_key = None
                     self.refresh_traffic_layer()
                     self.update_traffic_summary()
-                    if self.pinned and self.action_target and self.action_target[0] == 'edge' and self.mode == 'Traffic simulation':
+                    if self.pinned and not impact_was_visible and self.action_target and self.action_target[0] == 'edge' and self.mode == 'Traffic simulation':
                         target = self.action_target
                         self.show_traffic_edge(target[1])
                         self.set_action(*target)
+                    auto = key[1:] != self.impact_auto_key
+                    self.impact_auto_key = key[1:]
+                    self.impact_button.configure(state='normal' if report.closed_roads else 'disabled')
+                    if report.closed_roads and auto:
+                        if self.mode != 'Traffic simulation':
+                            target = self.action_target
+                            self.set_mode('Traffic simulation')
+                            if target:
+                                self.set_action(*target)
+                        self.show_impacts()
+                        self.focus_impacts()
+                    elif impact_was_visible:
+                        if report.closed_roads:
+                            self.impact_panel.set_report(report, result)
+                        else:
+                            self.close_impacts()
             except CancelledError:
                 pass
             except Exception as error:
@@ -572,7 +705,7 @@ class CityCollapseApp(ctk.CTk):
         if self.traffic_model and not self.traffic_future and (not self.traffic_result or self.result_key != self.requested_key) and self.failed_key != self.requested_key:
             key = self.requested_key
             self.traffic_cancel_event = Event()
-            self.traffic_future = key, self.worker.submit(self.traffic_model.solve, *key, cancel_event=self.traffic_cancel_event)
+            self.traffic_future = key, self.worker.submit(self.solve_scenario, *key, cancel_event=self.traffic_cancel_event)
         if self.tiles:
             if self.tiles.poll():
                 self.invalidate(traffic=False)
@@ -614,7 +747,8 @@ class CityCollapseApp(ctk.CTk):
         else:
             if not self.traffic_paint_future and self.traffic_painted_revision != self.traffic_revision:
                 revision, camera = self.traffic_revision, self.camera
-                arguments = (camera, self.datasets['views']['KML road graph'], self.traffic_result, self.selected)
+                arguments = (camera, self.datasets['views']['KML road graph'], self.traffic_result, self.selected,
+                             self.impact_report if self.impact_on.get() else None, self.active_diversion, self.datasets)
                 def paint(revision=revision, camera=camera, arguments=arguments):
                     image, paths = self.traffic_painter.frame(*arguments)
                     return revision, camera, image, paths

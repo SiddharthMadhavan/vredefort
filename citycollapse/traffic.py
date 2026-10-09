@@ -70,6 +70,17 @@ class TrafficResult:
     relative_gap: float
     iterations: int
     converged: bool
+    routes: tuple = ()
+
+
+@dataclass(frozen=True, slots=True)
+class AssignedRoute:
+    source: str
+    target: str
+    edge_ids: tuple
+    flow: float
+    travel_time_s: float
+    length_m: float
 
 
 class TrafficModel:
@@ -89,7 +100,7 @@ class TrafficModel:
             self.adjacency[edge['source']].append((edge['target'], i))
             self.adjacency[edge['target']].append((edge['source'], i))
 
-    def shortest_paths(self, origin, costs, closed, destinations):
+    def shortest_paths(self, origin, costs, closed, destinations, forbidden_nodes=frozenset()):
         """One Dijkstra per origin, preserving parallel edge identities."""
         distances, parents, heap = {origin: 0.0}, {}, [(0.0, origin)]
         remaining = set(destinations)
@@ -99,7 +110,7 @@ class TrafficModel:
                 continue
             remaining.discard(node)
             for target, index in self.adjacency[node]:
-                if index in closed:
+                if index in closed or target in forbidden_nodes:
                     continue
                 candidate = distance + costs[index]
                 if candidate < distances.get(target, math.inf):
@@ -202,6 +213,7 @@ class TrafficModel:
 
         def assign(times):
             extra, routed, unmet, shortest_total = [0.0] * len(self.edges), 0.0, endpoint_unmet, 0.0
+            allocations = {}
             for origin, destinations in grouped.items():
                 checkpoint()
                 paths = self.shortest_paths(origin, times, closed, destinations)
@@ -210,19 +222,20 @@ class TrafficModel:
                         unmet += demand
                         continue
                     path = paths[destination]
+                    allocations[(origin, destination, path)] = demand
                     routed += demand
                     shortest_total += demand * sum(times[index] for index in path)
                     for index in path:
                         extra[index] += demand
-            return extra, routed, unmet, shortest_total
+            return extra, routed, unmet, shortest_total, allocations
 
-        extra, routed, unmet, _ = assign(observed_times)
+        extra, routed, unmet, _, allocations = assign(observed_times)
         gap, iterations = 0.0, 0
         if routed:
             for iteration in range(1, max_iterations + 1):
                 checkpoint()
                 times = costs(extra)
-                target, _, _, shortest = assign(times)
+                target, _, _, shortest, target_allocations = assign(times)
                 current = sum(x * t for x, t in zip(extra, times))
                 gap = max(0.0, (current - shortest) / current) if current else 0.0
                 iterations = iteration
@@ -230,6 +243,9 @@ class TrafficModel:
                     break
                 weight = 1 / (iteration + 1)
                 extra = [x + weight * (y - x) for x, y in zip(extra, target)]
+                allocations = {key: flow * (1 - weight) for key, flow in allocations.items()}
+                for key, flow in target_allocations.items():
+                    allocations[key] = allocations.get(key, 0.0) + weight * flow
         times = costs(extra)
         links = {}
         for i, (edge, row, capacity, time) in enumerate(zip(self.edges, rows, capacities, times)):
@@ -239,5 +255,47 @@ class TrafficModel:
             links[edge['id']] = LinkState(row[0], background[i] + extra[i], capacity,
                                          0.0 if is_closed else row[1] / ratio,
                                          severity, ratio, is_closed)
+        routes = tuple(AssignedRoute(a, b, tuple(self.edges[index]['id'] for index in path), flow,
+                                     sum(times[index] for index in path), sum(self.edges[index]['length_m'] for index in path))
+                       for (a, b, path), flow in sorted(allocations.items()) if flow > 0)
         return TrafficResult(hour, links, blocked_nodes, sum(demands.values()) + endpoint_unmet,
-                             routed, unmet, gap, iterations, gap <= tolerance)
+                             routed, unmet, gap, iterations, gap <= tolerance, routes)
+
+    def diversion_paths(self, identifier, result, limit=3, cancel_event=None):
+        """Yen's k shortest loopless routes under the final scenario travel times."""
+        edge = self.edges[self.by_id[identifier]]
+        source, destination = edge['source'], edge['target']
+        if source == destination or source in result.blocked_nodes or destination in result.blocked_nodes:
+            return ()
+        closed = {self.by_id[key] for key, state in result.links.items() if state.closed}
+        closed.add(self.by_id[identifier])
+        costs = [e['length_m'] / (result.links[e['id']].speed / 3.6)
+                 if result.links[e['id']].speed > 0 else math.inf for e in self.edges]
+        initial = self.shortest_paths(source, costs, closed, {destination}).get(destination)
+        if initial is None:
+            return ()
+        accepted, candidates, seen = [initial], [], {initial}
+        while len(accepted) < limit:
+            path = accepted[-1]
+            nodes, node = [source], source
+            for index in path:
+                e = self.edges[index]
+                node = e['target'] if e['source'] == node else e['source']
+                nodes.append(node)
+            for i, spur in enumerate(nodes[:-1]):
+                if cancel_event is not None and cancel_event.is_set():
+                    raise CancelledError('Diversion preview superseded')
+                root = path[:i]
+                banned = closed | {route[i] for route in accepted if len(route) > i and route[:i] == root}
+                suffix = self.shortest_paths(spur, costs, banned, {destination}, set(nodes[:i])).get(destination)
+                if suffix is not None:
+                    candidate = root + suffix
+                    if candidate not in seen:
+                        seen.add(candidate)
+                        heapq.heappush(candidates, (sum(costs[index] for index in candidate), candidate))
+            if not candidates:
+                break
+            accepted.append(heapq.heappop(candidates)[1])
+        return tuple(AssignedRoute(source, destination, tuple(self.edges[i]['id'] for i in path), 0.0,
+                                   sum(costs[i] for i in path), sum(self.edges[i]['length_m'] for i in path))
+                     for path in accepted)

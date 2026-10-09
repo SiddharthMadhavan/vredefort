@@ -69,6 +69,30 @@ model calculations and map image loading. State changes fade smoothly while
 the previous display remains visible. Play/Pause controls the clock and flow.
 Trails are visual cues, not vehicles or measurements of directional traffic.
 Motion is limited on short/offscreen roads and has a viewport budget for speed.
+Closure mode highlights every closed edge and every edge with numerically
+positive added assigned flow (tolerance max(1e-6 veh/h, baseline*1e-9)).
+Affected junction markers are endpoints of these edges, not simulated signal
+or junction failures. Lists are paginated, with every affected item accessible.
+
+DIVERSION PREVIEWS
+MSA path allocations are retained and exactly reconstruct detour link flows.
+For an explicitly blocked road, Yen's algorithm offers up to three shortest
+loopless endpoint-to-endpoint routes under the final scenario travel costs.
+Every preview avoids all currently blocked roads and junctions. Route travel
+time is the sum of current scenario edge travel times; it is not the forecast
+after all drivers switch to that preview. Selecting a route changes only the
+map highlight, not the traffic assignment. Junction closures show the actual
+approach-to-approach paths and flow used by MSA. No feasible path is reported
+explicitly, including unknown self-loop trip destinations and blocked endpoints.
+
+INFRASTRUCTURE FLAGS
+Only the existing mapped hospitals and fire stations are assessed. A facility
+within 250m of a blocked or diversion-loaded polyline is flagged for potential
+access delay using a local Web Mercator distance corrected for latitude.
+This proximity flag does not establish loss of access, an outage, response
+time, or service failure. All nearby affected edge IDs and the nearest distance
+are retained. Original coordinate provenance and inferred hospital matches
+remain visible. Unmapped hospitals and assets without data cannot be assessed.
 Blocked edges are muted with red crosses; blocked junctions are red squares.
 Road details include baseline flow, scenario flow, estimated capacity, speed,
 congestion and closure state. All scenario results remain labelled synthetic.

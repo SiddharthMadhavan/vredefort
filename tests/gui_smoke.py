@@ -11,6 +11,7 @@ app = CityCollapseApp()
 errors, stages = [], []
 started = time.monotonic()
 first_trail = None
+capture_prepared = False
 
 
 def callback_error(kind, error, traceback):
@@ -22,12 +23,21 @@ def callback_error(kind, error, traceback):
 app.report_callback_exception = callback_error
 
 
+def capture(path):
+    if sys.platform == 'win32':
+        # Capture this window even when the user is working in another app.
+        ImageGrab.grab(window=app.winfo_id()).save(path)
+    else:
+        ImageGrab.grab(bbox=(app.winfo_rootx(), app.winfo_rooty(), app.winfo_rootx() + app.winfo_width(),
+                            app.winfo_rooty() + app.winfo_height())).save(path)
+
+
 def ready():
     return app.traffic_result and app.result_key == app.requested_key and not app.traffic_future
 
 
 def check():
-    global first_trail
+    global first_trail, capture_prepared
     try:
         if time.monotonic() - started > 90:
             raise AssertionError(f'GUI timed out at {stages}')
@@ -99,6 +109,63 @@ def check():
         elif stage == 'clear':
             assert not app.blocked_edges and not app.blocked_nodes
             assert not any(s.closed for s in app.traffic_result.links.values())
+            app.inspect_affected_road('kml_merged_e_19725_0_1')
+            app.toggle_block_target()
+            stages.append('impact report')
+        elif stage == 'impact report':
+            report = app.impact_report
+            assert len(report.loaded_roads) == 55
+            assert len(report.facilities) == 3
+            assert len(report.diversions) == 3
+            if not app.impact_panel.winfo_ismapped() and app.impact_panel.place_info():
+                app.after(100, check)
+                return
+            assert app.impact_panel.winfo_ismapped(), (app.sim_status.cget('text'), app.impact_panel.place_info(), app.pinned)
+            app.impact_panel.set_tab('Roads')
+            assert app.impact_panel.next.cget('state') == 'normal'
+            app.impact_panel.turn_page(1)
+            assert app.impact_panel.page_label.cget('text') == '31-56 / 56'
+            app.impact_panel.set_tab('Diversions')
+            app.preview_diversion(report.diversions[0])
+            assert app.active_diversion == report.diversions[0]
+            stages.append('impact capture')
+        elif stage == 'impact capture':
+            if app.traffic_painted_revision != app.traffic_revision or app.traffic_fade_to is not None:
+                app.after(100, check)
+                return
+            if not capture_prepared:
+                # Tk may retain an old native backing buffer while fully occluded.
+                # Briefly expose this test window before capturing its actual UI.
+                capture_prepared = True
+                app.lift()
+                app.after(200, check)
+                return
+            folder = Path('.tmp'); folder.mkdir(exist_ok=True)
+            assert app.traffic_bitmap_camera == app.camera
+            assert not app.traffic_render_error, app.traffic_render_error
+            app.traffic_display_bitmap.save(folder / 'impact-layer.png')
+            capture(folder / 'impact-smoke.png')
+            assert app.impact_panel.winfo_y() + app.impact_panel.winfo_height() < app.winfo_height() - 10, (
+                app.impact_panel.winfo_y(), app.impact_panel.winfo_height(), app.winfo_height(),
+                app.impact_panel.body.cget('height'), app.impact_panel.note.winfo_height())
+            facility = app.impact_report.facilities[0]
+            point = app.datasets[facility.kind][facility.index]['point']
+            app.camera = replace(app.camera, x=point[0], y=point[1], zoom=16)
+            app.pick(app.camera.width / 2, app.camera.height / 2)
+            assert app.detail_title.cget('text') == app.impact_report.facilities[0].name
+            assert 'no outage' in app.detail_body.cget('text')
+            app.show_impacts()
+            assert app.impact_panel.place_info()
+            app.seek_hour(9)
+            stages.append('impact hour')
+        elif stage == 'impact hour':
+            assert app.impact_panel.winfo_ismapped()
+            assert app.impact_panel.result.hour == 9
+            app.clear_blocks()
+            stages.append('final clear')
+        elif stage == 'final clear':
+            assert not app.impact_report.affected_roads
+            assert not app.impact_panel.winfo_ismapped()
             app.set_mode('KML width shading')
             app.set_width_field('RR_width_B')
             app.set_mode('OSM road graph')
@@ -127,10 +194,8 @@ def check():
             assert app.traffic_image
             folder = Path('.tmp')
             folder.mkdir(exist_ok=True)
-            ImageGrab.grab(bbox=(app.winfo_rootx(), app.winfo_rooty(),
-                                app.winfo_rootx() + app.winfo_width(),
-                                app.winfo_rooty() + app.winfo_height())).save(folder / 'traffic-smoke.png')
-            print(f'GUI smoke passed: hourly playback, real edge/node picking, blocking, unblocking, clear, map modes and facilities; {len(app.tiles.images)} basemap tiles.', flush=True)
+            capture(folder / 'traffic-smoke.png')
+            print(f'GUI smoke passed: continuous flow, closures, complete impact pagination, 55 loaded roads, 3 facilities, 3 diversion previews, hourly report updates and clearing; {len(app.tiles.images)} basemap tiles.', flush=True)
             app.close()
             return
         app.after(150, check)
