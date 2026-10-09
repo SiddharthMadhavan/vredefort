@@ -45,7 +45,7 @@ def markdown_runs(source):
     """Render the Markdown used in analyst replies, preserving code and road IDs."""
     fence = None
     for line in source.splitlines(keepends=True):
-        content = line.rstrip('\r\n')
+        content = line.rstrip('\r\n').replace('\u2022', '-')
         newline = '\n' if line.endswith(('\n', '\r')) else ''
         marker = re.match(r'^\s{0,3}(`{3,}|~{3,})(.*)$', content)
         if fence:
@@ -72,7 +72,7 @@ def markdown_runs(source):
                 tags = ('quote',)
             bullet = re.match(r'^(\s*)(?:[-+*]|(\d+)[.)])\s+(.*)$', content)
             if bullet:
-                prefix = f'{bullet[2]}. ' if bullet[2] else '\u2022 '
+                prefix = f'{bullet[2]}. ' if bullet[2] else '- '
                 yield bullet[1] + prefix, tags + ('list',)
                 content = bullet[3]
                 tags += ('list',)

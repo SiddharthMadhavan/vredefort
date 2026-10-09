@@ -165,7 +165,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
-        self.detail_text('Select a road, then press Enter to run all five traffic agents. History uses synthetic data.', True)
+        self.detail_text('Select a road, then press Enter to run all five traffic agents.', True)
 
     def select_road(self, identifier):
         network = self.network
@@ -387,6 +387,8 @@ class CityCollapseApp(ctk.CTk):
 
     def resize(self, event):
         if event.width > 0 and event.height > 0:
+            if not hasattr(self, 'detail_body'):
+                return
             self.camera = replace(self.camera, width=event.width, height=event.height)
             scaling = self.details._get_widget_scaling()
             self.detail_body.configure(height=max(150, min(350, event.height / scaling - 260)))
