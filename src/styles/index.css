@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+:root { font-family: "Segoe UI", Arial, sans-serif; color: #f4f4f6; background: #14151a; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.map-workspace { position: relative; height: 100dvh; overflow: hidden; }
+.map-canvas { position: absolute; inset: 0; }
+.map-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 8px; background: #16161c; color: #c7c7d0; font-size: 13px; }
+.map-status button { font: inherit; color: #c7b8ff; background: none; border: none; cursor: pointer; text-decoration: underline; }
+button:focus-visible, a:focus-visible { outline: 2px solid #a497f8; outline-offset: 3px; }
+.maplibregl-ctrl-attrib { background: #1b1b22ef !important; color: #aaa8b6 !important; font-size: 10px !important; }
+.maplibregl-ctrl-attrib a { color: #c5c2d1 !important; }
