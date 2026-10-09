@@ -2,6 +2,8 @@
 import json
 import customtkinter as ctk
 
+from .markdown_text import MarkdownTextbox
+
 
 class AnalystPanel(ctk.CTkFrame):
     def __init__(self, parent, font, small_font, on_close):
@@ -30,14 +32,15 @@ class AnalystPanel(ctk.CTkFrame):
             text_color='#abd2ad', corner_radius=3)
         self.tabs.grid(row=3, column=0, padx=14, pady=(0, 18), sticky='nsew')
         self.tabs._segmented_button.configure(font=small_font)
-        self.reply = self.textbox('Analysis', font)
+        self.reply = self.textbox('Analysis', font, markdown=True)
         self.evidence = self.textbox('Evidence', small_font)
         self.bind('<Configure>', self.resize_labels)
 
-    def textbox(self, name, font):
+    def textbox(self, name, font, markdown=False):
         tab = self.tabs.add(name)
-        text = ctk.CTkTextbox(tab, font=font, text_color='#abd2ad',
-                             fg_color='transparent', wrap='word', state='disabled')
+        widget = MarkdownTextbox if markdown else ctk.CTkTextbox
+        text = widget(tab, font=font, text_color='#abd2ad',
+                      fg_color='transparent', wrap='word', state='disabled')
         text.pack(fill='both', expand=True)
         return text
 
@@ -56,7 +59,7 @@ class AnalystPanel(ctk.CTkFrame):
     def begin(self, road_id, model):
         self.target.configure(text=f'{road_id}\nOllama / {model}')
         self.set_status('Collecting live traffic...')
-        self.replace_text(self.reply, '')
+        self.reply.set_markdown('')
         self.replace_text(self.evidence, 'Waiting for traffic evidence...')
         self.tabs.set('Analysis')
 
@@ -69,9 +72,4 @@ class AnalystPanel(ctk.CTkFrame):
             self.set_status('Live measurements unavailable / Ollama will assess the evidence gaps', error=True)
 
     def append(self, text):
-        at_bottom = self.reply.yview()[1] >= .98
-        self.reply.configure(state='normal')
-        self.reply.insert('end', text)
-        if at_bottom:
-            self.reply.see('end')
-        self.reply.configure(state='disabled')
+        self.reply.append_markdown(text)
