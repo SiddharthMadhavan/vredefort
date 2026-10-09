@@ -1,0 +1,16 @@
+{
+  "title": "Bengaluru synthetic hourly road traffic",
+  "synthetic": true,
+  "source": "User-provided bengaluru_road_traffic_synthetic_hourly.csv",
+  "generation_method": "Not supplied; no claim of measured historical traffic.",
+  "usage": "Demonstration baseline only, not actual historical observations.",
+  "transformation": "Lossless gzip compression; all original CSV columns and rows preserved.",
+  "source_sha256": "ad9bfdb0cd75e2d25f0a3b24beb45c618124f2420c6f9927a0565da5382ee5a3",
+  "compressed_sha256": "fd443791cd319f69902451fff3e216ab7fb26726e2739141dc355444cb63077c",
+  "records": 747264,
+  "edge_count": 4448,
+  "first_timestamp": "2026-10-01 00:00:00",
+  "last_timestamp": "2026-10-07 23:00:00",
+  "timezone": "Asia/Kolkata assumed for Date values; CSV does not specify timezone.",
+  "prepared_at_utc": "2026-10-09T22:41:12+00:00"
+}

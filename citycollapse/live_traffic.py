@@ -44,6 +44,13 @@ class AnalysisCancel(Event):
                 connection.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
+            # makefile() retains the socket even after .close(). Force the handle
+            # closed so Windows also wakes a read waiting in select(). The socket
+            # object's descriptor is invalidated, so later cleanup is safe.
+            try:
+                connection._real_close()
+            except OSError:
+                pass
 
 
 SYSTEM_PROMPT = """You are CityCollapse's Live Traffic Analyst for Bengaluru.
@@ -195,11 +202,9 @@ class LiveTrafficAnalyst:
             check_cancel(cancel)
             connection.connect()
             connection.sock.settimeout(timeout)
-            # HTTP/1.0 may close the connection object's handle while its response
-            # still owns a file reader. Keep a duplicate handle for cancellation.
-            active_socket = socket.socket(
-                connection.sock.family, connection.sock.type, connection.sock.proto,
-                fileno=socket.dup(connection.sock.fileno()))
+            # Retain the original socket even when HTTPConnection clears .sock
+            # for HTTP/1.0, so cancellation closes the reader's actual handle.
+            active_socket = connection.sock
             if isinstance(cancel, AnalysisCancel):
                 cancel.attach(active_socket)
             check_cancel(cancel)
@@ -267,12 +272,23 @@ class LiveTrafficAnalyst:
 
     def analyze(self, network, road_id, cancel, emit):
         evidence = self.collect_evidence(network, road_id, cancel, emit)
+        self.analyze_evidence(evidence, cancel, emit)
+
+    def analyze_evidence(self, evidence, cancel, emit):
         check_cancel(cancel)
         emit('evidence', evidence)
+        self.stream_reply(evidence, SYSTEM_PROMPT, cancel, emit)
+        count, total = evidence['available_samples'], len(evidence['observations'])
+        emit('done', f'Analysis complete / {count} of {total} traffic samples available'
+             if count else 'Assessment complete / live measurements unavailable')
+
+    def stream_reply(self, evidence, prompt, cancel, emit):
+        """Shared, cancellable Ollama transport; each analyst supplies its own facts."""
+        check_cancel(cancel)
         emit('status', f'Waiting for {self.config["model"]} / first load may take a moment')
         body = {'model': self.config['model'], 'stream': True, 'keep_alive': '5m',
                 'options': {'temperature': .2, 'num_predict': 700, 'num_ctx': 8192},
-                'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
+                'messages': [{'role': 'system', 'content': prompt},
                              {'role': 'user', 'content': json.dumps(evidence, ensure_ascii=False)}]}
         request = urllib.request.Request(self.config['ollama_url'] + '/api/chat',
                                          data=json.dumps(body).encode('utf-8'),
@@ -319,6 +335,3 @@ class LiveTrafficAnalyst:
         if not complete or not produced:
             raise ValueError('Ollama ended without a complete reply. Press Enter to retry.')
         check_cancel(cancel)
-        count, total = evidence['available_samples'], len(evidence['observations'])
-        emit('done', f'Analysis complete / {count} of {total} traffic samples available'
-             if count else 'Assessment complete / live measurements unavailable')

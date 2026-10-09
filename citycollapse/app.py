@@ -16,8 +16,9 @@ from .config import settings, analyst_settings
 from .geometry import project
 from .map_renderer import Camera, FONT_FILE, TileCache
 from .explore_map import load_network, nearest_node, nearest_road, paint_explore
-from .live_traffic import LiveTrafficAnalyst, AnalysisCancel, sample_road
+from .live_traffic import AnalysisCancel, sample_road
 from .analyst_panel import AnalystPanel
+from .traffic_agents import TrafficAnalysts
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -47,7 +48,7 @@ class CityCollapseApp(ctk.CTk):
         self.agent_generation = 0
         self.agent_busy = False
         self.agent_target = None
-        self.agent_factory = LiveTrafficAnalyst
+        self.agent_factory = TrafficAnalysts
         self.network = self.selection = self.drag_origin = None
         self.dragged = False
         self.camera = Camera(*CENTRE, 11, width, height)
@@ -163,7 +164,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
-        self.detail_text('Select a road, then press Enter for the Live Traffic Analyst.', True)
+        self.detail_text('Select a road, then press Enter for Live and Historical Traffic Analysts. History uses synthetic data.', True)
 
     def select_road(self, identifier):
         network = self.network
@@ -231,7 +232,8 @@ class CityCollapseApp(ctk.CTk):
             self.agent_generation += 1
             self.agent_busy = False
             self.agent_target = None
-            self.analyst_panel.set_status('Selection changed / select a road and press Enter')
+            for agent in ('live', 'historical'):
+                self.analyst_panel.set_status('Selection changed / select a road and press Enter', agent=agent)
 
     def analyze_selected(self, event=None):
         if self.network is None or not self.selection or self.selection[0] != 'road':
@@ -263,7 +265,7 @@ class CityCollapseApp(ctk.CTk):
             self.analyst_panel.begin(road_id, 'configuration error')
             self.analyst_panel.set_status(str(error), error=True)
             return 'break'
-        self.analyst_panel.begin(road_id, config['model'])
+        self.analyst_panel.begin(road_id, config['model'], config['history_model'])
         network, factory, events = self.network, self.agent_factory, self.agent_events
 
         def emit(kind, value):
@@ -282,7 +284,7 @@ class CityCollapseApp(ctk.CTk):
             finally:
                 emit('finished', None)
 
-        self.agent_thread = Thread(target=run, daemon=True, name='live-traffic-analyst')
+        self.agent_thread = Thread(target=run, daemon=True, name='traffic-analysts')
         self.agent_thread.start()
         return 'break'
 
@@ -310,7 +312,7 @@ class CityCollapseApp(ctk.CTk):
         self.status.place_configure(y=-12)
 
     def poll_analyst(self):
-        tokens = []
+        tokens = {'live': [], 'historical': []}
         for _ in range(200):
             try:
                 generation, kind, value = self.agent_events.get_nowait()
@@ -318,22 +320,25 @@ class CityCollapseApp(ctk.CTk):
                 break
             if generation != self.agent_generation or not self.agent_target:
                 continue
+            agent = 'live'
+            if kind == 'agent_event':
+                agent, kind, value = value['agent'], value['kind'], value['value']
             if kind == 'token':
-                tokens.append(value)
+                tokens[agent].append(value)
             elif kind == 'status':
-                self.analyst_panel.set_status(value)
+                self.analyst_panel.set_status(value, agent=agent)
             elif kind == 'evidence':
-                self.analyst_panel.set_evidence(value)
+                self.analyst_panel.set_evidence(value, agent=agent)
             elif kind == 'error':
-                self.analyst_panel.set_status(value, error=True)
+                self.analyst_panel.set_status(value, error=True, agent=agent)
+                tokens[agent].append('\n\n' + value)
+            elif kind == 'finished':
                 self.agent_busy = False
-                tokens.append('\n\n' + value)
-            elif kind in ('done', 'finished'):
-                self.agent_busy = False
-                if kind == 'done':
-                    self.analyst_panel.set_status(value)
-        if tokens:
-            self.analyst_panel.append(''.join(tokens))
+            elif kind == 'done':
+                self.analyst_panel.set_status(value, agent=agent)
+        for agent, chunks in tokens.items():
+            if chunks:
+                self.analyst_panel.append(''.join(chunks), agent=agent)
 
     def pick(self, x, y):
         if self.network is None:

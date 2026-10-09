@@ -84,7 +84,7 @@ class AnalystTests(unittest.TestCase):
             worker.start()
             self.assertTrue(first_token.wait(3))
             cancel.set()
-            worker.join(1)
+            worker.join(.5)
             self.assertFalse(worker.is_alive(), 'Cancellation left the network read blocked')
             self.assertFalse(failures)
 

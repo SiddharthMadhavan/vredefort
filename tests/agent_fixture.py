@@ -49,6 +49,11 @@ def fixture_server(chat_delay=.06, chat_status=200, flow_status=200):
             self.end_headers()
             chunks = ['Test fixture analyst: ', 'current speed is 24 km/h. ',
                       'Provider observation age is unknown.']
+            if 'Historical Traffic Analyst' in body['messages'][0]['content']:
+                chunks = ['## Synthetic historical overview\n\n',
+                          '**Synthetic baseline — demonstration only.**\n\n',
+                          '- Test fixture historical analyst: the synthetic baseline is 20 km/h.\n'
+                          '- This does not describe measured historical traffic.']
             try:
                 for text in chunks:
                     time.sleep(chat_delay)
