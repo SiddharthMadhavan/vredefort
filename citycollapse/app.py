@@ -19,6 +19,7 @@ from .explore_map import load_network, nearest_node, nearest_road, paint_explore
 from .live_traffic import AnalysisCancel, sample_road
 from .analyst_panel import AnalystPanel
 from .traffic_agents import TrafficAnalysts
+from .agent_catalog import AGENTS, agent_models
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -164,7 +165,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
-        self.detail_text('Select a road, then press Enter for Live and Historical Traffic Analysts. History uses synthetic data.', True)
+        self.detail_text('Select a road, then press Enter to run all five traffic agents. History uses synthetic data.', True)
 
     def select_road(self, identifier):
         network = self.network
@@ -232,15 +233,16 @@ class CityCollapseApp(ctk.CTk):
             self.agent_generation += 1
             self.agent_busy = False
             self.agent_target = None
-            for agent in ('live', 'historical'):
-                self.analyst_panel.set_status('Selection changed / select a road and press Enter', agent=agent)
+            for spec in AGENTS:
+                self.analyst_panel.set_status('Selection changed / select a road and press Enter', agent=spec.key)
+            self.analyst_panel.set_pipeline_status('Cancelled / selection changed')
 
     def analyze_selected(self, event=None):
         if self.network is None or not self.selection or self.selection[0] != 'road':
             self.status.configure(text='Select a road, then press Enter to analyze traffic.')
             return 'break'
         if self.agent_thread and self.agent_thread.is_alive():
-            self.analyst_panel.set_status('Analysis in progress; a cancelled request may take a moment to stop.')
+            self.analyst_panel.set_pipeline_status('Analysis in progress; a cancelled request may take a moment to stop.')
             return 'break'
         road_id = self.selection[1]
         self.agent_generation += 1
@@ -263,9 +265,11 @@ class CityCollapseApp(ctk.CTk):
         except ValueError as error:
             self.agent_busy = False
             self.analyst_panel.begin(road_id, 'configuration error')
-            self.analyst_panel.set_status(str(error), error=True)
+            for spec in AGENTS:
+                self.analyst_panel.set_status(str(error), error=True, agent=spec.key)
+            self.analyst_panel.set_pipeline_status('Not started / configuration error')
             return 'break'
-        self.analyst_panel.begin(road_id, config['model'], config['history_model'])
+        self.analyst_panel.begin(road_id, config['model'], config['history_model'], models=agent_models(config))
         network, factory, events = self.network, self.agent_factory, self.agent_events
 
         def emit(kind, value):
@@ -281,6 +285,7 @@ class CityCollapseApp(ctk.CTk):
                 # Only controlled errors reach the UI; never display provider URLs/keys.
                 message = str(error) if isinstance(error, ValueError) else 'Analysis failed. Check traffic configuration and Ollama, then retry.'
                 emit('error', message)
+                emit('pipeline_status', 'Run stopped / ' + message)
             finally:
                 emit('finished', None)
 
@@ -312,7 +317,7 @@ class CityCollapseApp(ctk.CTk):
         self.status.place_configure(y=-12)
 
     def poll_analyst(self):
-        tokens = {'live': [], 'historical': []}
+        tokens = {spec.key: [] for spec in AGENTS}
         for _ in range(200):
             try:
                 generation, kind, value = self.agent_events.get_nowait()
@@ -323,6 +328,8 @@ class CityCollapseApp(ctk.CTk):
             agent = 'live'
             if kind == 'agent_event':
                 agent, kind, value = value['agent'], value['kind'], value['value']
+            if agent not in tokens:
+                continue
             if kind == 'token':
                 tokens[agent].append(value)
             elif kind == 'status':
@@ -336,6 +343,8 @@ class CityCollapseApp(ctk.CTk):
                 self.agent_busy = False
             elif kind == 'done':
                 self.analyst_panel.set_status(value, agent=agent)
+            elif kind == 'pipeline_status':
+                self.analyst_panel.set_pipeline_status(value)
         for agent, chunks in tokens.items():
             if chunks:
                 self.analyst_panel.append(''.join(chunks), agent=agent)

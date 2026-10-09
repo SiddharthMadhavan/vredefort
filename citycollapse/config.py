@@ -41,5 +41,8 @@ def analyst_settings():
         raise ValueError('OLLAMA_MODEL cannot be empty')
     return {'ollama_url': base_url, 'model': model,
             'history_model': values.get('OLLAMA_HISTORY_MODEL', model).strip() or model,
+            'network_model': values.get('OLLAMA_NETWORK_MODEL', model).strip() or model,
+            'planner_model': values.get('OLLAMA_PLANNER_MODEL', model).strip() or model,
+            'review_model': values.get('OLLAMA_REVIEW_MODEL', model).strip() or model,
             'history_csv': values.get('CITYCOLLAPSE_HISTORY_CSV') or str(ROOT / 'data' / 'synthetic' / 'bengaluru_road_traffic_synthetic_hourly.csv.gz'),
             'tomtom_key': values.get('TOMTOM_API_KEY') or values.get('CITYCOLLAPSE_TOMTOM_API_KEY', '')}

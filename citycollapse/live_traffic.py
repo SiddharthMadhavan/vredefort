@@ -282,12 +282,12 @@ class LiveTrafficAnalyst:
         emit('done', f'Analysis complete / {count} of {total} traffic samples available'
              if count else 'Assessment complete / live measurements unavailable')
 
-    def stream_reply(self, evidence, prompt, cancel, emit):
+    def stream_reply(self, evidence, prompt, cancel, emit, context_size=8192):
         """Shared, cancellable Ollama transport; each analyst supplies its own facts."""
         check_cancel(cancel)
         emit('status', f'Waiting for {self.config["model"]} / first load may take a moment')
         body = {'model': self.config['model'], 'stream': True, 'keep_alive': '5m',
-                'options': {'temperature': .2, 'num_predict': 700, 'num_ctx': 8192},
+                'options': {'temperature': .2, 'num_predict': 700, 'num_ctx': context_size},
                 'messages': [{'role': 'system', 'content': prompt},
                              {'role': 'user', 'content': json.dumps(evidence, ensure_ascii=False)}]}
         request = urllib.request.Request(self.config['ollama_url'] + '/api/chat',

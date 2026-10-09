@@ -113,7 +113,7 @@ class HistoricalTests(unittest.TestCase):
             agents.analyze(self.network, 'e0', AnalysisCancel(), lambda *event: events.append(event))
         self.assertEqual(len([request for kind, request in requests if kind == 'GET']), 2)
         prompts = [body for kind, body in requests if kind == 'POST']
-        self.assertEqual(len(prompts), 2)
+        self.assertEqual(len(prompts), 5)
         self.assertIn('Live Traffic Analyst', prompts[0]['messages'][0]['content'])
         self.assertIn('Historical Traffic Analyst', prompts[1]['messages'][0]['content'])
         self.assertIn('synthetic', prompts[1]['messages'][0]['content'].lower())
@@ -122,15 +122,16 @@ class HistoricalTests(unittest.TestCase):
                         kind == 'agent_event' and value['agent'] == 'historical' and value['kind'] == 'evidence')
         self.assertEqual(payload, json.loads(json.dumps(evidence)))
         self.assertNotIn('fixture-key', json.dumps(prompts))
-        self.assertEqual({value['agent'] for kind, value in events if value['kind'] == 'done'}, {'live', 'historical'})
+        self.assertEqual({value['agent'] for kind, value in events if kind == 'agent_event' and value['kind'] == 'done'},
+                         {'live', 'historical', 'network', 'planner', 'review'})
 
     def test_live_agent_survives_missing_history_dataset(self):
         with fixture_server() as (url, requests):
             agents = TrafficAnalysts({**self.config, 'history_csv': str(self.folder / 'missing.csv'), 'ollama_url': url})
             events = []
             agents.analyze(self.network, 'e0', AnalysisCancel(), lambda *event: events.append(event))
-        self.assertTrue(any(value['agent'] == 'live' and value['kind'] == 'done' for _, value in events))
-        errors = [value for _, value in events if value['kind'] == 'error']
+        self.assertTrue(any(value['agent'] == 'live' and value['kind'] == 'done' for kind, value in events if kind == 'agent_event'))
+        errors = [value for kind, value in events if kind == 'agent_event' and value['kind'] == 'error']
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0]['agent'], 'historical')
 

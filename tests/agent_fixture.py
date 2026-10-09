@@ -8,7 +8,7 @@ from urllib.parse import urlsplit, parse_qs
 
 
 @contextmanager
-def fixture_server(chat_delay=.06, chat_status=200, flow_status=200):
+def fixture_server(chat_delay=.06, chat_status=200, flow_status=200, chat_fail_role=None):
     requests = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -41,8 +41,8 @@ def fixture_server(chat_delay=.06, chat_status=200, flow_status=200):
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             requests.append(('POST', body))
-            if chat_status != 200:
-                self.send_json(chat_status, {'error': 'Test-only missing model'})
+            if chat_status != 200 or (chat_fail_role and chat_fail_role in body['messages'][0]['content']):
+                self.send_json(chat_status if chat_status != 200 else 500, {'error': 'Test-only missing model'})
                 return
             self.send_response(200)
             self.send_header('Content-Type', 'application/x-ndjson')
@@ -54,6 +54,18 @@ def fixture_server(chat_delay=.06, chat_status=200, flow_status=200):
                           '**Synthetic baseline — demonstration only.**\n\n',
                           '- Test fixture historical analyst: the synthetic baseline is 20 km/h.\n'
                           '- This does not describe measured historical traffic.']
+            elif 'Network Bottleneck Analyst' in body['messages'][0]['content']:
+                chunks = ['## Confirmed network facts\n\n',
+                          '**Test fixture network analyst.**\n\n',
+                          'Connectivity is inferred; the historical baseline is synthetic.']
+            elif 'Road Improvement Planner' in body['messages'][0]['content']:
+                chunks = ['## Candidate improvements\n\n',
+                          '**Test fixture improvement planner.**\n\n',
+                          'Measure turning movements before evaluating a signal-timing pilot.']
+            elif 'Critical Reviewer' in body['messages'][0]['content']:
+                chunks = ['## Review findings\n\n',
+                          '**Test fixture critical reviewer.**\n\n',
+                          '## Final priorities\n\nConfirm field conditions; the historical baseline is synthetic.']
             try:
                 for text in chunks:
                     time.sleep(chat_delay)

@@ -61,6 +61,10 @@ try:
     panel.append('More streaming text.\n')
     app.update()
     assert reply.index('@0,0') == top, 'New tokens moved a reader who scrolled up'
+    panel.append('## Network reply\n' + 'Example network paragraph.\n' * 100, agent='network')
+    panel.select_agent('03 Network bottlenecks')
+    app.update()
+    assert panel.replies['network'].yview()[0] <= .02, 'An unread agent reply should open at the beginning'
     panel.begin('new-road', 'llama3.1:8b')
     panel.append('Fresh reply')
     assert reply.source == 'Fresh reply' and reply.get('1.0', 'end-1c') == 'Fresh reply'
