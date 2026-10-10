@@ -13,6 +13,7 @@ from .impacts import build_impact_report
 from .simulation_data import load_simulation_data
 from .traffic_animation import FlowLayer
 from .traffic_rendering import TrafficPainter
+from .presentation import display_text
 
 
 class SimulationController:
@@ -21,6 +22,7 @@ class SimulationController:
         self.enabled = self.running = False
         self.heatmap_enabled = False
         self.model = self.datasets = self.result = self.report = None
+        self.baseline_result = self.comparison = None
         self.load_future = self.solve_future = self.paint_future = None
         self.cancel = Event()
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='traffic-model')
@@ -47,7 +49,7 @@ class SimulationController:
             widget.grid(row=row, column=0, columnspan=2, sticky='ew', padx=4, pady=2)
             return widget
 
-        self.legend = label('SYNTHETIC / GREEN: LOW · RED: HIGH', 0)
+        self.legend = label('GREEN: LOW · RED: HIGH', 0)
         self.time_label = label('Loading traffic...', 1, '#abd2ad')
         self.slider = ctk.CTkSlider(self.frame, from_=0, to=167, number_of_steps=167,
                                    command=self.seek, state='disabled', height=16,
@@ -72,7 +74,9 @@ class SimulationController:
         self.impact_button.grid(row=5, column=0, padx=3, pady=3, sticky='ew')
         self.heatmap_button = app.button(self.frame, 'Heatmap: OFF', self.toggle_heatmap, width=112)
         self.heatmap_button.grid(row=5, column=1, padx=3, pady=3, sticky='ew')
-        self.status = label('Loading synthetic traffic...', 6)
+        self.compare_button = app.button(self.frame, 'Compare before / after', self.show_comparison, state='disabled')
+        self.compare_button.grid(row=6, column=0, columnspan=2, sticky='ew', padx=3, pady=3)
+        self.status = label('Loading traffic...', 7)
 
     def set_enabled(self, enabled):
         self.enabled = enabled
@@ -80,7 +84,7 @@ class SimulationController:
             self.frame.pack(fill='x', padx=12, pady=(0, 6), before=self.app.detail_title)
             if not self.model and not self.load_future:
                 self.error = ''
-                self.status.configure(text='Loading synthetic traffic...')
+                self.status.configure(text='Loading traffic...')
                 self.load_future = self.pool.submit(load_simulation_data, self.app.network)
         else:
             self.running = False
@@ -91,6 +95,8 @@ class SimulationController:
             self.app.canvas.itemconfigure(self.item, state='hidden')
             if self.impact_window:
                 self.impact_window.withdraw()
+            if self.comparison:
+                self.comparison.window.withdraw()
         self.last_tick = time.perf_counter()
         self.selection_changed()
         self.app.resize_detail_body()
@@ -166,9 +172,10 @@ class SimulationController:
         self.slider.set(hour)
 
     def solve(self, key, cancel):
-        result = self.model.solve(*key, cancel_event=cancel)
+        baseline = self.model.solve(key[0], cancel_event=cancel)
+        result = self.model.solve(*key, cancel_event=cancel) if key[1] or key[2] else baseline
         report = build_impact_report(self.model, result, self.datasets, key[1], cancel)
-        return key, result, report
+        return key, baseline, result, report
 
     def paint_key(self):
         route = self.active_diversion.route.edge_ids if self.active_diversion else None
@@ -183,10 +190,11 @@ class SimulationController:
     def summary(self):
         r = self.result
         self.status.configure(text=(f'{len(self.blocked_edges)} roads / {len(self.blocked_nodes)} junctions blocked\n'
-                                   f'Rerouted {r.rerouted_demand:,.0f} / unmet {r.unmet_demand:,.0f} veh/h\n'
-                                   'Synthetic model / no physical queues' +
+                                   f'Rerouted {r.rerouted_demand:,.0f} / unmet {r.unmet_demand:,.0f} veh/h' +
                                    (' / approximate' if not r.converged else '')))
+        self.compare_button.configure(state='normal')
         self.impact_button.configure(state='normal' if self.report.closed_roads else 'disabled')
+        self.app.after_idle(self.app.resize_detail_body)
         if self.app.selection and self.app.selection[0] == 'road':
             self.app.show_simulation_details(self.app.selection[1])
 
@@ -203,21 +211,22 @@ class SimulationController:
                 self.request()
                 self.selection_changed()
             except Exception as error:
-                self.error = f'Simulation unavailable: {error}'
+                self.error = display_text(f'Simulation unavailable: {error}')
                 self.status.configure(text=self.error + '\nSwitch modes to retry.')
         if self.solve_future and self.solve_future.done():
             future, self.solve_future = self.solve_future, None
             try:
-                key, result, report = future.result()
+                key, baseline, result, report = future.result()
                 if key == self.requested_key:
                     self.result_key, self.result, self.report = key, result, report
+                    self.baseline_result = baseline
                     self.summary()
             except CancelledError:
                 pass
             except Exception as error:
                 if self.solving_key == self.requested_key:
                     self.failed_key = self.solving_key
-                    self.status.configure(text=f'Scenario failed: {error}\nChange hour or blocks to retry.')
+                    self.status.configure(text=display_text(f'Scenario failed: {error}\nChange hour or blocks to retry.'))
                     self.running = False
                     self.play_button.configure(text='Play')
         if not self.enabled:
@@ -256,7 +265,7 @@ class SimulationController:
                     self.app.canvas.tag_raise(self.app.hover_item)
             except Exception as error:
                 self.painted_key = key
-                self.status.configure(text=f'Traffic painting failed: {error}')
+                self.status.configure(text=display_text(f'Traffic painting failed: {error}'))
         if not self.paint_future and key != self.painted_key and now >= self.app.paint_after:
             result, report, selected, diversion = self.result, self.report, self.app.selection, self.active_diversion
             camera = self.app.camera
@@ -282,7 +291,7 @@ class SimulationController:
             return
         if self.impact_window is None or not self.impact_window.winfo_exists():
             self.impact_window = ctk.CTkToplevel(self.app)
-            self.impact_window.title('CityCollapse / Synthetic closure impacts')
+            self.impact_window.title('CityCollapse / Closure impacts')
             self.impact_window.geometry('390x760')
             self.impact_window.minsize(370, 520)
             self.impact_window.protocol('WM_DELETE_WINDOW', self.impact_window.withdraw)
@@ -345,10 +354,21 @@ class SimulationController:
 
     def show_model(self):
         self.app.clear_body()
-        self.app.detail_title.configure(text='SYNTHETIC TRAFFIC MODEL')
-        self.app.detail_text((DATA / 'traffic-model.txt').read_text(encoding='utf-8'))
+        self.app.detail_title.configure(text='TRAFFIC MODEL')
+        self.app.detail_text(display_text((DATA / 'traffic-model.txt').read_text(encoding='utf-8')))
+
+    def show_comparison(self):
+        if self.baseline_result is None:
+            return
+        if self.comparison is None:
+            from .comparison_view import ComparisonView
+            self.comparison = ComparisonView(self)
+        self.comparison.window.deiconify()
+        self.comparison.window.lift()
 
     def close(self):
+        if self.comparison:
+            self.comparison.close()
         self.cancel.set()
         self.pool.shutdown(wait=False, cancel_futures=True)
         self.paint_pool.shutdown(wait=False, cancel_futures=True)

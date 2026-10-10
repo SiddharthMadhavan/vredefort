@@ -4,6 +4,7 @@ import customtkinter as ctk
 
 from .markdown_text import MarkdownTextbox
 from .agent_catalog import AGENTS, AGENT_BY_CHOICE
+from .presentation import display_text, display_evidence
 
 
 class AnalystPanel(ctk.CTkFrame):
@@ -56,6 +57,7 @@ class AnalystPanel(ctk.CTkFrame):
         self.visited_agents = {'live'}
         self.statuses = {spec.key: ('Waiting for analysis', False) for spec in AGENTS}
         self.evidences = {spec.key: None for spec in AGENTS}
+        self.raw_replies = {spec.key: '' for spec in AGENTS}
         self.models = {spec.key: '' for spec in AGENTS}
         self.road_id = ''
         self.agent_picker.set('01 Live')
@@ -92,6 +94,7 @@ class AnalystPanel(ctk.CTkFrame):
         self.evidences = {spec.key: None for spec in AGENTS}
         for reply in self.replies.values():
             reply.set_markdown('')
+        self.raw_replies = {spec.key: '' for spec in AGENTS}
         self.visited_agents = {'live'}
         self.set_pipeline_status('Starting traffic analysis...')
         self.agent_picker.set('01 Live')
@@ -113,23 +116,25 @@ class AnalystPanel(ctk.CTkFrame):
             self.visited_agents.add(self.active_agent)
         self.set_status(*self.statuses[self.active_agent], agent=self.active_agent)
         evidence = self.evidences[self.active_agent]
-        self.replace_text(self.evidence, json.dumps(evidence, indent=2, ensure_ascii=False) if evidence else 'Waiting for traffic evidence...')
+        self.replace_text(self.evidence, json.dumps(display_evidence(evidence), indent=2, ensure_ascii=False) if evidence else 'Waiting for traffic evidence...')
 
     def set_status(self, text, error=False, agent='live'):
         self.statuses[agent] = (text, error)
         if agent == self.active_agent:
-            self.status.configure(text=text, text_color='#e4a58e' if error else '#7eaf87')
+            self.status.configure(text=display_text(text), text_color='#e4a58e' if error else '#7eaf87')
 
     def set_pipeline_status(self, text):
-        self.pipeline_status.configure(text=text)
+        self.pipeline_status.configure(text=display_text(text))
 
     def set_evidence(self, evidence, agent='live'):
         self.evidences[agent] = evidence
         if agent == self.active_agent:
-            self.replace_text(self.evidence, json.dumps(evidence, indent=2, ensure_ascii=False))
+            self.replace_text(self.evidence, json.dumps(display_evidence(evidence), indent=2, ensure_ascii=False))
         if agent in ('live', 'historical') and evidence.get('available_samples') == 0:
-            message = 'Synthetic history unavailable for these edges' if agent == 'historical' else 'Live measurements unavailable / Ollama will assess the evidence gaps'
+            message = 'Historical baseline unavailable for these edges' if agent == 'historical' else 'Live measurements unavailable / Ollama will assess the evidence gaps'
             self.set_status(message, error=True, agent=agent)
 
     def append(self, text, agent='live'):
-        self.replies[agent].append_markdown(text)
+        self.raw_replies[agent] += text
+        reply = self.replies[agent]
+        reply.set_markdown(display_text(self.raw_replies[agent]), follow=reply.yview()[1] >= .98)

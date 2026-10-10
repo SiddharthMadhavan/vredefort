@@ -13,14 +13,14 @@ class AgentSpec:
 
 AGENTS = (
     AgentSpec('live', 'LIVE TRAFFIC ANALYST', '01 Live', 'model', ''),
-    AgentSpec('historical', 'HISTORICAL TRAFFIC ANALYST', '02 History (synthetic)', 'history_model',
-              'SYNTHETIC DATA / DEMONSTRATION ONLY'),
+    AgentSpec('historical', 'HISTORICAL TRAFFIC ANALYST', '02 History', 'history_model',
+              'HISTORICAL BASELINE'),
     AgentSpec('network', 'NETWORK BOTTLENECK ANALYST', '03 Network bottlenecks', 'network_model',
-              'INFERRED GRAPH / SYNTHETIC BASELINE INCLUDED'),
+              'INFERRED GRAPH'),
     AgentSpec('planner', 'ROAD IMPROVEMENT PLANNER', '04 Road improvements', 'planner_model',
-              'CONDITIONAL PROPOSALS / SYNTHETIC BASELINE INCLUDED'),
+              'CONDITIONAL PROPOSALS'),
     AgentSpec('review', 'CRITICAL REVIEW + FINAL RECOMMENDATIONS', '05 Review and final recommendations', 'review_model',
-              'REVIEWED PROPOSALS / SYNTHETIC BASELINE INCLUDED'),
+              'REVIEWED PROPOSALS'),
 )
 AGENT_BY_KEY = {agent.key: agent for agent in AGENTS}
 AGENT_BY_CHOICE = {agent.choice: agent for agent in AGENTS}

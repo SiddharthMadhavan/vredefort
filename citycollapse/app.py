@@ -21,6 +21,7 @@ from .analyst_panel import AnalystPanel
 from .traffic_agents import TrafficAnalysts
 from .agent_catalog import AGENTS, agent_models
 from .simulation_controller import SimulationController
+from .presentation import display_text
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -173,7 +174,7 @@ class CityCollapseApp(ctk.CTk):
 
     def detail_text(self, text, muted=False):
         label = ctk.CTkLabel(
-            self.detail_body, text=text, font=self.small_font,
+            self.detail_body, text=display_text(text), font=self.small_font,
             text_color='#819487' if muted else FG, wraplength=252,
             justify='left', anchor='w')
         label.pack(fill='x', padx=4, pady=4)
@@ -239,7 +240,7 @@ class CityCollapseApp(ctk.CTk):
             button.pack(padx=4, pady=3)
         self.detail_text('Source: existing KML road graph.\nJunction topology is inferred, not surveyed.', True)
         if self.simulation.enabled:
-            self.detail_text('Block this junction with the simulation controls above. All incident roads close in the synthetic scenario.', True)
+            self.detail_text('Block this junction with the simulation controls above. All incident roads close in the scenario.', True)
         self.clear_button.configure(state='normal')
         self.invalidate()
 
@@ -268,7 +269,7 @@ class CityCollapseApp(ctk.CTk):
         sim = self.simulation
         if sim.enabled and sim.result and identifier in sim.result.links:
             state = sim.result.links[identifier]
-            text = (f'SYNTHETIC SCENARIO\nBaseline {state.baseline:,.0f} / assigned {state.flow:,.0f} veh/h\n'
+            text = (f'SCENARIO\nBaseline {state.baseline:,.0f} / assigned {state.flow:,.0f} veh/h\n'
                     f'Estimated capacity {state.capacity:,.0f} veh/h\n'
                     f'Speed {state.speed:.1f} km/h / congestion {state.congestion:.0%}\n'
                     + ('Blocked' if state.closed else f'Travel-time multiplier {state.delay_ratio:.2f}'))
@@ -542,6 +543,8 @@ class CityCollapseApp(ctk.CTk):
         now = time.perf_counter()
         self.poll_analyst()
         self.simulation.tick(now)
+        if self.simulation.comparison:
+            self.simulation.comparison.tick(now)
         if self.data_future and self.data_future.done():
             future, self.data_future = self.data_future, None
             try:
@@ -591,6 +594,7 @@ class CityCollapseApp(ctk.CTk):
                 message = f'Loading basemap / {pending} tiles remaining'
             else:
                 message = f'Bengaluru / zoom {self.camera.zoom} / drag to pan'
+        message = display_text(message)
         if self.status.cget('text') != message:
             self.status.configure(text=message)
         self.after_id = self.after(33, self.tick)

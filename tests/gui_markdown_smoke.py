@@ -68,6 +68,11 @@ try:
     panel.begin('new-road', 'llama3.1:8b')
     panel.append('Fresh reply')
     assert reply.source == 'Fresh reply' and reply.get('1.0', 'end-1c') == 'Fresh reply'
+    panel.append('\nSyn')
+    panel.append('thetic baseline')
+    assert 'synthetic' not in reply.source.lower()
+    assert 'model-generated baseline' in reply.source
+    assert 'Synthetic baseline' in panel.raw_replies['live']
     print('Markdown GUI smoke passed: styles, streamed delimiters, DPI scaling, '
           'raw evidence, read-only text, scroll preservation, and response reset.')
 finally:

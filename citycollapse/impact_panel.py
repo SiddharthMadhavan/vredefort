@@ -49,7 +49,7 @@ class ImpactPanel(ctk.CTkFrame):
         self.report, self.result = report, result
         self.summary.configure(text=f'{len(report.closed_roads)} blocked / {len(report.loaded_roads)} roads with extra traffic\n'
                                     f'{len(report.affected_nodes)} connected nodes / {len(report.facilities)} nearby facilities\n'
-                                    f'Synthetic: rerouted {result.rerouted_demand:,.0f} / unmet {result.unmet_demand:,.0f} veh/h\n'
+                                    f'Rerouted {result.rerouted_demand:,.0f} / unmet {result.unmet_demand:,.0f} veh/h\n'
                                     'RED: blocked / GOLD: changed / CYAN: detours')
         self.render_page()
 

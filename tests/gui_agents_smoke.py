@@ -72,9 +72,9 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.3) a
                     return
                 assert app.agent_busy, 'Pipeline stopped being busy between the two agents'
                 assert 'Test fixture analyst' in panel.reply.source
-                panel.select_agent('02 History (synthetic)')
+                panel.select_agent('02 History')
                 assert panel.active_agent == 'historical'
-                assert 'SYNTHETIC DATA' in panel.target.cget('text')
+                assert 'HISTORICAL BASELINE' in panel.target.cget('text')
                 before = app.camera.x
                 app.pan_keyboard(100, 0)
                 assert app.camera.x > before, 'Map froze while agent 2 streamed'
@@ -84,11 +84,13 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.3) a
                     app.after(40, check)
                     return
                 content = panel.history_reply.get('1.0', 'end')
-                assert 'Synthetic baseline' in content and '**' not in content and '##' not in content
+                assert 'model-generated baseline' in content and '**' not in content and '##' not in content
                 assert panel.history_reply.tag_ranges('heading2') and panel.history_reply.tag_ranges('strong')
                 evidence = json.loads(panel.evidence.get('1.0', 'end'))
-                assert evidence['synthetic'] and evidence['selected_road']['id'] == road_id
-                assert evidence['observations'][0]['synthetic_history']['overall']['samples'] == 21
+                assert evidence['model_generated'] and evidence['selected_road']['id'] == road_id
+                assert evidence['observations'][0]['historical_baseline']['overall']['samples'] == 21
+                assert panel.evidences['historical']['synthetic']
+                assert 'synthetic' not in panel.evidence.get('1.0', 'end').lower()
                 assert len([body for kind, body in requests if kind == 'POST']) == 5
                 for spec in AGENTS:
                     panel.select_agent(spec.choice)
