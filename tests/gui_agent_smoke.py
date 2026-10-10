@@ -8,14 +8,14 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
-from citycollapse.geometry import project
-from citycollapse.live_traffic import LiveTrafficAnalyst, sample_road
+from vredefort.app import VredefortApp
+from vredefort.geometry import project
+from vredefort.live_traffic import LiveTrafficAnalyst, sample_road
 from agent_fixture import fixture_server
 
 
-with fixture_server(chat_delay=.3) as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
-    app = CityCollapseApp()
+with fixture_server(chat_delay=.3) as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
+    app = VredefortApp()
     # These explicitly labelled fixture measurements never enter production code.
     app.agent_factory = lambda config: LiveTrafficAnalyst({
         **config, 'tomtom_key': 'fixture-key', 'ollama_url': url})
@@ -88,14 +88,14 @@ with fixture_server(chat_delay=.3) as (url, requests), patch('citycollapse.live_
                 assert 'fixture-key' not in json.dumps(evidence)
                 app.analyst_panel.reply.insert('end', 'USER EDIT')
                 assert app.analyst_panel.reply.get('1.0', 'end') == reply, 'Reply should be read-only'
-                if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT'):
+                if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT'):
                     app.lift()
                     stage = 'capture'
                     app.after(250, check)
                     return
                 stage = 'capture'
             elif stage == 'capture':
-                if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+                if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
                     from PIL import ImageGrab
                     Path('.tmp').mkdir(exist_ok=True)
                     ImageGrab.grab(window=app.winfo_id()).save('.tmp/analyst-smoke.png')

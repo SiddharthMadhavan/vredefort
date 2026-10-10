@@ -88,9 +88,9 @@ def fixture_server(chat_delay=.06, chat_status=200, flow_status=200, chat_fail_r
 
 
 def fixture_network():
-    from citycollapse.data import Road, SpatialIndex
-    from citycollapse.explore_map import RoadNetwork
-    from citycollapse.geometry import project
+    from vredefort.data import Road, SpatialIndex
+    from vredefort.explore_map import RoadNetwork
+    from vredefort.geometry import project
     coordinates = [(77.6, 12.97), (77.601, 12.97), (77.602, 12.97)]
     nodes = [{'id': f'n{i}', 'number': i + 1, 'degree': 2 if i == 1 else 1,
               'kind': 'endpoint', 'coordinate': point, 'point': project(*point)}

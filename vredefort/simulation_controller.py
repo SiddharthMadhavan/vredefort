@@ -342,7 +342,7 @@ class SimulationController:
             return
         if self.impact_window is None or not self.impact_window.winfo_exists():
             self.impact_window = ctk.CTkToplevel(self.app)
-            self.impact_window.title('vredefort / Closure impacts')
+            self.impact_window.title('Vredefort / Closure impacts')
             self.impact_window.geometry('390x760')
             self.impact_window.minsize(370, 520)
             self.impact_window.protocol('WM_DELETE_WINDOW', self.impact_window.withdraw)

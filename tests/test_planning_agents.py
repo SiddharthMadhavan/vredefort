@@ -5,11 +5,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from citycollapse.agent_catalog import AGENTS
-from citycollapse.historical_traffic import HistoricalDataset
-from citycollapse.live_traffic import AnalysisCancel
-from citycollapse.planning_agents import prior_reports
-from citycollapse.traffic_agents import TrafficAnalysts
+from vredefort.agent_catalog import AGENTS
+from vredefort.historical_traffic import HistoricalDataset
+from vredefort.live_traffic import AnalysisCancel
+from vredefort.planning_agents import prior_reports
+from vredefort.traffic_agents import TrafficAnalysts
 from agent_fixture import fixture_network, fixture_server
 from history_fixture import write_history
 
@@ -32,7 +32,7 @@ class PlanningPipelineTests(unittest.TestCase):
 
     def test_five_distinct_roles_receive_facts_and_prior_opinions(self):
         events = []
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             reports = self.pipeline(url).analyze(self.network, 'e0', AnalysisCancel(), lambda *event: events.append(event))
         prompts = [body for kind, body in requests if kind == 'POST']
         self.assertEqual(len(prompts), 5)
@@ -60,7 +60,7 @@ class PlanningPipelineTests(unittest.TestCase):
     def test_planner_failure_is_labelled_and_review_still_runs(self):
         events = []
         with fixture_server(chat_fail_role='Road Improvement Planner') as (url, requests), \
-                patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+                patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             reports = self.pipeline(url).analyze(self.network, 'e0', AnalysisCancel(), lambda *event: events.append(event))
         self.assertEqual(reports['planner']['status'], 'failed')
         self.assertEqual(reports['review']['status'], 'complete')
@@ -73,7 +73,7 @@ class PlanningPipelineTests(unittest.TestCase):
 
     def test_missing_history_does_not_become_real_history_downstream(self):
         self.history.unlink()
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             reports = self.pipeline(url).analyze(self.network, 'e0', AnalysisCancel(), lambda *args: None)
         self.assertEqual(reports['historical']['status'], 'failed')
         review = json.loads([body for kind, body in requests if kind == 'POST'][-1]['messages'][1]['content'])
@@ -87,13 +87,13 @@ class PlanningPipelineTests(unittest.TestCase):
         def emit(kind, value):
             if kind == 'agent_event' and value['agent'] == 'network' and value['kind'] == 'token':
                 cancel.set()
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             with self.assertRaises(CancelledError):
                 self.pipeline(url).analyze(self.network, 'e0', cancel, emit)
         self.assertEqual(len([body for kind, body in requests if kind == 'POST']), 3)
 
     def test_unfinished_upstream_output_is_not_marked_complete(self):
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             pipeline = self.pipeline(url)
             def partial_planner(evidence, cancel, emit):
                 emit('evidence', evidence)

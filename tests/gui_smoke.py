@@ -6,10 +6,10 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp, CENTRE
-from citycollapse.explore_map import nearest_node, nearest_road
+from vredefort.app import VredefortApp, CENTRE
+from vredefort.explore_map import nearest_node, nearest_road
 
-app = CityCollapseApp()
+app = VredefortApp()
 errors = []
 started = time.monotonic()
 stage = 'startup'
@@ -133,13 +133,13 @@ def check():
             assert app.camera.x > old.x, 'Keyboard pan failed'
             stage = 'capture'
         elif stage == 'capture':
-            if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT'):
+            if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT'):
                 app.lift()
             stage = 'capture ready'
             app.after(250, check)
             return
         elif stage == 'capture ready':
-            if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+            if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
                 from PIL import ImageGrab
                 folder = Path('.tmp')
                 folder.mkdir(exist_ok=True)

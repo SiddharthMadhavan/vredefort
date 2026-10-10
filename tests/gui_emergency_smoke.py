@@ -9,13 +9,13 @@ from unittest.mock import patch
 from PIL import ImageGrab
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
-from citycollapse.emergency_rendering import visible_risks, route_paths
+from vredefort.app import VredefortApp
+from vredefort.emergency_rendering import visible_risks, route_paths
 
 
 with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
-        'CITYCOLLAPSE_USER_DIR': temporary, 'CITYCOLLAPSE_MAP_OFFLINE': 'true', 'CITYCOLLAPSE_MAP_PATH': ''}):
-    app = CityCollapseApp()
+        'VREDEFORT_USER_DIR': temporary, 'VREDEFORT_MAP_OFFLINE': 'true', 'VREDEFORT_MAP_PATH': ''}):
+    app = VredefortApp()
     started, stage, failures = time.monotonic(), 'startup', []
     baseline_pixels = report = blocked_node = None
 
@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                 if not app.network or not app.map_image:
                     app.after(60, check)
                     return
-                assert app.title() == 'vredefort / Road explorer'
+                assert app.title() == 'Vredefort / Road explorer'
                 assert not emergency.enabled and emergency.report is None
                 app.set_mode('Traffic simulation')
                 stage = 'simulation'
@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                 assert len(report.anchors) + len(report.skipped) == len(sim.datasets['hospitals']) + len(sim.datasets['fire'])
                 assert len([p for p in report.locations if p.kind == 'hospitals']) == 255
                 assert not report.skipped and len(report.anchors) == 276
-                assert emergency.window.title() == 'vredefort / Emergency services'
+                assert emergency.window.title() == 'Vredefort / Emergency services'
                 assert emergency.panel.report is report and emergency.panel.rows
                 assert sim.bitmap.tobytes() != baseline_pixels
                 assert not sim.running and sim.clock_s == 0

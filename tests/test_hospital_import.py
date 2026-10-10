@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from citycollapse.data import DATA, read_points
-from citycollapse.hospital_import import SOURCES, import_hospitals, parse_hospitals
+from vredefort.data import DATA, read_points
+from vredefort.hospital_import import SOURCES, import_hospitals, parse_hospitals
 
 
 def write_kml(path, category, rows):

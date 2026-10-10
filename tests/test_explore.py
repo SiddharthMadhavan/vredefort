@@ -3,12 +3,12 @@ import unittest
 from unittest.mock import patch
 from PIL import Image
 
-from citycollapse.data import Road, SpatialIndex
-from citycollapse.explore_map import (
+from vredefort.data import Road, SpatialIndex
+from vredefort.explore_map import (
     RoadNetwork, load_network, nearest_node, nearest_road, paint_explore, ExplorePainter,
 )
-from citycollapse.geometry import project, unproject
-from citycollapse.map_renderer import Camera
+from vredefort.geometry import project, unproject
+from vredefort.map_renderer import Camera
 
 
 class ExplorerTests(unittest.TestCase):
@@ -67,7 +67,7 @@ class ExplorerTests(unittest.TestCase):
         self.assertEqual(normal.getpixel((200, 150)), selected.getpixel((200, 150)))
 
     def test_selection_reuses_base_and_tile_replacement_invalidates_it(self):
-        from citycollapse import explore_map
+        from vredefort import explore_map
         painter = ExplorePainter()
         with patch.object(explore_map, '_paint_base', wraps=explore_map._paint_base) as render:
             normal = painter.paint(self.camera, {}, self.network, None)

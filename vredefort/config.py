@@ -19,7 +19,7 @@ def environment_values():
     user = read_user_settings()
     values.update(user)
     if 'TOMTOM_API_KEY' in user:
-        values['CITYCOLLAPSE_TOMTOM_API_KEY'] = user['TOMTOM_API_KEY']
+        values['VREDEFORT_TOMTOM_API_KEY'] = user['TOMTOM_API_KEY']
     return values
 
 
@@ -29,10 +29,10 @@ DEFAULT_TILE_URL = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
 
 def settings(values=None):
     values = environment_values() if values is None else values
-    template = values.get('CITYCOLLAPSE_TILE_URL') or values.get('VITE_MAP_TILE_URL') or DEFAULT_TILE_URL
+    template = values.get('VREDEFORT_TILE_URL') or values.get('VITE_MAP_TILE_URL') or DEFAULT_TILE_URL
     parsed = urlsplit(template)
     if parsed.scheme not in ('http', 'https') or not all('{' + token + '}' in template for token in ('x', 'y', 'z')):
-        raise ValueError('CITYCOLLAPSE_TILE_URL must be an HTTP raster URL with {z}, {x}, {y}')
+        raise ValueError('VREDEFORT_TILE_URL must be an HTTP raster URL with {z}, {x}, {y}')
     key = values.get('VITE_CARTO_API_KEY', '')
     if 'VITE_CARTO_API_KEY' in values and (parsed.hostname == 'basemaps.cartocdn.com' or (parsed.hostname or '').endswith('.basemaps.cartocdn.com')):
         query = dict(parse_qsl(parsed.query))
@@ -47,12 +47,12 @@ def settings(values=None):
             preferences = {}
     except (OSError, ValueError):
         preferences = {}
-    offline = values.get('CITYCOLLAPSE_MAP_OFFLINE', str(preferences.get('offline', False))).lower() in ('true', '1', 'yes')
-    local_path = values.get('CITYCOLLAPSE_MAP_PATH', preferences.get('local_path')) or None
+    offline = values.get('VREDEFORT_MAP_OFFLINE', str(preferences.get('offline', False))).lower() in ('true', '1', 'yes')
+    local_path = values.get('VREDEFORT_MAP_PATH', preferences.get('local_path')) or None
     if local_path is not None and not isinstance(local_path, str):
-        raise ValueError('CITYCOLLAPSE_MAP_PATH must be a local raster map path')
+        raise ValueError('VREDEFORT_MAP_PATH must be a local raster map path')
     return {'tile_url': template, 'offline': offline, 'local_path': local_path,
-            'attribution': values.get('CITYCOLLAPSE_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO'}
+            'attribution': values.get('VREDEFORT_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO'}
 
 
 def save_map_preferences(offline, local_path):
@@ -76,5 +76,5 @@ def analyst_settings(values=None):
             'network_model': values.get('OLLAMA_NETWORK_MODEL', model).strip() or model,
             'planner_model': values.get('OLLAMA_PLANNER_MODEL', model).strip() or model,
             'review_model': values.get('OLLAMA_REVIEW_MODEL', model).strip() or model,
-            'history_csv': values.get('CITYCOLLAPSE_HISTORY_CSV') or str(ROOT / 'data' / 'synthetic' / 'bengaluru_road_traffic_synthetic_hourly.csv.gz'),
-            'tomtom_key': values.get('TOMTOM_API_KEY') or values.get('CITYCOLLAPSE_TOMTOM_API_KEY', '')}
+            'history_csv': values.get('VREDEFORT_HISTORY_CSV') or str(ROOT / 'data' / 'synthetic' / 'bengaluru_road_traffic_synthetic_hourly.csv.gz'),
+            'tomtom_key': values.get('TOMTOM_API_KEY') or values.get('VREDEFORT_TOMTOM_API_KEY', '')}

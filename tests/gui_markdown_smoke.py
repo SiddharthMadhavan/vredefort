@@ -9,8 +9,8 @@ from tkinter import font as tkfont
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import customtkinter as ctk
-from citycollapse.analyst_panel import AnalystPanel
-from citycollapse.map_renderer import FONT_FILE
+from vredefort.analyst_panel import AnalystPanel
+from vredefort.map_renderer import FONT_FILE
 
 
 if sys.platform == 'win32' and FONT_FILE.exists():
@@ -47,7 +47,7 @@ try:
     assert json.loads(panel.evidence.get('1.0', 'end'))['example'] == '**raw JSON**'
     reply.insert('end', 'UNAUTHORIZED EDIT')
     assert reply.get('1.0', 'end-1c') == content, 'Analysis must remain read-only'
-    if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+    if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
         from PIL import ImageGrab
         app.lift()
         app.update()

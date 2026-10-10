@@ -6,7 +6,7 @@ import time
 
 from PIL import ImageGrab
 
-from .app import CityCollapseApp
+from .app import VredefortApp
 from .config import analyst_settings, settings
 from .paths import ROOT, USER_DIR, CACHE_DIR
 from .user_settings import SETTINGS_FILE
@@ -14,7 +14,7 @@ from .user_settings import SETTINGS_FILE
 
 def run_self_test(report_path):
     report, stage, started = {}, 'startup', time.monotonic()
-    app = CityCollapseApp()
+    app = VredefortApp()
 
     def finish(error=None):
         report['status'] = 'failed' if error else 'passed'
@@ -38,7 +38,7 @@ def run_self_test(report_path):
                 assert (ROOT / 'data/synthetic/bengaluru_road_traffic_synthetic_hourly.csv.gz').exists()
                 report.update(roads=len(app.network.roads), nodes=len(app.network.nodes),
                     frozen=bool(getattr(sys, 'frozen', False)), bundled_resources=True)
-                assert app.title() == 'vredefort / Road explorer'
+                assert app.title() == 'Vredefort / Road explorer'
                 report['app_title'] = app.title()
                 if report['frozen']:
                     assert not (ROOT / '.env').exists() and not (ROOT / '.env.local').exists()

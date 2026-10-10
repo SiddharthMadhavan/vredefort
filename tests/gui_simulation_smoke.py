@@ -8,18 +8,18 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
-from citycollapse.agent_catalog import AGENTS
-from citycollapse.historical_traffic import HistoricalDataset
-from citycollapse.traffic_agents import TrafficAnalysts
+from vredefort.app import VredefortApp
+from vredefort.agent_catalog import AGENTS
+from vredefort.historical_traffic import HistoricalDataset
+from vredefort.traffic_agents import TrafficAnalysts
 from agent_fixture import fixture_server
 from history_fixture import write_history
 
 
 with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) as (url, requests), \
-        patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
     folder = Path(temporary)
-    app = CityCollapseApp()
+    app = VredefortApp()
     started = time.monotonic()
     stage, failures = 'startup', []
     baseline_result = baseline_bitmap = baseline_key = None
@@ -122,7 +122,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                 app.after(250, check)
                 return
             elif stage == 'capture':
-                if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+                if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
                     from PIL import ImageGrab
                     Path('.tmp').mkdir(exist_ok=True)
                     ImageGrab.grab(window=app.winfo_id()).save('.tmp/simulation-agents-smoke.png')
@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                     app.after(50, check)
                     return
                 app.update_idletasks()
-                if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+                if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
                     from PIL import ImageGrab
                     Path('.tmp').mkdir(exist_ok=True)
                     ImageGrab.grab(window=app.winfo_id()).save('.tmp/simulation-compact-smoke.png')

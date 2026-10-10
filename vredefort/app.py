@@ -31,14 +31,14 @@ BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
 
 
-class CityCollapseApp(ctk.CTk):
+class VredefortApp(ctk.CTk):
     def __init__(self):
         ctk.set_appearance_mode('dark')
         ctk.set_default_color_theme('green')
         if sys.platform == 'win32' and FONT_FILE.exists():
             ctypes.windll.gdi32.AddFontResourceExW(str(FONT_FILE), 0x10, 0)
         super().__init__()
-        self.title('vredefort / Road explorer')
+        self.title('Vredefort / Road explorer')
         scale = self._get_window_scaling()
         width = min(1400, int((self.winfo_screenwidth() - 80) / scale))
         height = min(900, int((self.winfo_screenheight() - 140) / scale))
@@ -122,7 +122,7 @@ class CityCollapseApp(ctk.CTk):
         self.details.place(x=16, y=16)
         heading = ctk.CTkFrame(self.details, fg_color='transparent')
         heading.pack(fill='x', padx=16, pady=(12, 0))
-        ctk.CTkLabel(heading, text='vredefort_', text_color=FG,
+        ctk.CTkLabel(heading, text='Vredefort_', text_color=FG,
                      font=ctk.CTkFont(self.font_name, 28)).pack(
                          side='left')
         self.settings_button = self.button(heading, 'Settings', self.show_settings,

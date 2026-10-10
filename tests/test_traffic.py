@@ -3,10 +3,10 @@ import math
 import unittest
 from concurrent.futures import CancelledError
 from threading import Event
-from citycollapse.data import DATA, load_json
-from citycollapse.traffic import TrafficDataset, TrafficModel, FIELDS
-from citycollapse.traffic_rendering import traffic_color
-from citycollapse.simulation_data import load_simulation_data
+from vredefort.data import DATA, load_json
+from vredefort.traffic import TrafficDataset, TrafficModel, FIELDS
+from vredefort.traffic_rendering import traffic_color
+from vredefort.simulation_data import load_simulation_data
 
 
 def model_fixture(edges, volumes=None, capacity=100):

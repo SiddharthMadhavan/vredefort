@@ -1,0 +1,1 @@
+"""Vredefort native desktop application."""

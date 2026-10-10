@@ -9,20 +9,20 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
-from citycollapse.geometry import project
-from citycollapse.historical_traffic import HistoricalDataset
-from citycollapse.live_traffic import sample_road
-from citycollapse.traffic_agents import TrafficAnalysts
-from citycollapse.agent_catalog import AGENTS
+from vredefort.app import VredefortApp
+from vredefort.geometry import project
+from vredefort.historical_traffic import HistoricalDataset
+from vredefort.live_traffic import sample_road
+from vredefort.traffic_agents import TrafficAnalysts
+from vredefort.agent_catalog import AGENTS
 from agent_fixture import fixture_server
 from history_fixture import write_history
 
 
 with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.3) as (url, requests), \
-        patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
     folder = Path(temporary)
-    app = CityCollapseApp()
+    app = VredefortApp()
     started = time.monotonic()
     failures = []
     stage = 'startup'
@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.3) a
                 panel.select_agent('05 Review and final recommendations')
                 stage = 'capture'
             elif stage == 'capture':
-                if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+                if os.environ.get('VREDEFORT_SMOKE_SCREENSHOT') and sys.platform == 'win32':
                     from PIL import ImageGrab
                     app.lift()
                     app.update_idletasks()

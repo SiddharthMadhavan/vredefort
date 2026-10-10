@@ -8,7 +8,7 @@ class SettingsPanel:
     def __init__(self, app):
         self.app = app
         self.window = ctk.CTkToplevel(app)
-        self.window.title('vredefort / Settings')
+        self.window.title('Vredefort / Settings')
         self.window.configure(fg_color='#0c1510')
         scale = self.window._get_window_scaling()
         height = min(570, int((self.window.winfo_screenheight() - 120) / scale))
@@ -60,7 +60,7 @@ class SettingsPanel:
             entry.delete(0, 'end')
             value = values.get(key, defaults.get(key, ''))
             if key == 'TOMTOM_API_KEY':
-                value = values.get(key) or values.get('CITYCOLLAPSE_TOMTOM_API_KEY', '')
+                value = values.get(key) or values.get('VREDEFORT_TOMTOM_API_KEY', '')
             entry.insert(0, value)
         self.show_keys.deselect()
         self.toggle_keys()

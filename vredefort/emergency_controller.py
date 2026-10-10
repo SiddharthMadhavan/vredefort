@@ -44,7 +44,7 @@ class EmergencyController:
         self.update_button()
         if self.window is None or not self.window.winfo_exists():
             self.window = ctk.CTkToplevel(self.sim.app)
-            self.window.title('vredefort / Emergency services')
+            self.window.title('Vredefort / Emergency services')
             scale = self.window._get_window_scaling()
             height = min(800, int((self.window.winfo_screenheight() - 140) / scale))
             self.window.geometry(f'480x{height}+60+40')

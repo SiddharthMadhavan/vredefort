@@ -10,8 +10,8 @@ import unittest
 from unittest.mock import patch
 
 from PIL import Image
-from citycollapse.map_renderer import TileCache
-from citycollapse import config
+from vredefort.map_renderer import TileCache
+from vredefort import config
 
 
 URL = 'https://tiles.example/{z}/{x}/{y}.png'
@@ -154,7 +154,7 @@ class MapCacheTests(unittest.TestCase):
             config.save_map_preferences(True, self.folder / 'map.mbtiles')
             self.assertTrue(config.settings()['offline'])
             self.assertEqual(config.settings()['local_path'], str(self.folder / 'map.mbtiles'))
-            with patch.object(config, 'environment_values', return_value={'CITYCOLLAPSE_MAP_OFFLINE': 'false', 'CITYCOLLAPSE_MAP_PATH': ''}):
+            with patch.object(config, 'environment_values', return_value={'VREDEFORT_MAP_OFFLINE': 'false', 'VREDEFORT_MAP_PATH': ''}):
                 self.assertFalse(config.settings()['offline'])
                 self.assertIsNone(config.settings()['local_path'])
 

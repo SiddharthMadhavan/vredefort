@@ -4,13 +4,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from citycollapse.analysis_scope import (AnalysisScope, MAX_AREA_ROADS, MAX_AREA_SAMPLES,
+from vredefort.analysis_scope import (AnalysisScope, MAX_AREA_ROADS, MAX_AREA_SAMPLES,
                                         connected_roads, scope_roads, selection_target, selection_roads)
-from citycollapse.data import Road
-from citycollapse.historical_traffic import HistoricalDataset
-from citycollapse.live_traffic import AnalysisCancel, road_context, sample_road
-from citycollapse.network_analysis import network_facts
-from citycollapse.traffic_agents import TrafficAnalysts
+from vredefort.data import Road
+from vredefort.historical_traffic import HistoricalDataset
+from vredefort.live_traffic import AnalysisCancel, road_context, sample_road
+from vredefort.network_analysis import network_facts
+from vredefort.traffic_agents import TrafficAnalysts
 from agent_fixture import fixture_network, fixture_server
 from history_fixture import write_history
 from test_network_analysis import add_road
@@ -95,7 +95,7 @@ class ScopeTests(unittest.TestCase):
             history = write_history(folder/'history.csv')
             for scope in (AnalysisScope.junction('n1'), AnalysisScope.area(['e0', 'e1'])):
                 with self.subTest(kind=scope.kind), fixture_server(chat_delay=.001) as (url, requests), \
-                        patch('citycollapse.live_traffic.FLOW_URL', url+'/flow'):
+                        patch('vredefort.live_traffic.FLOW_URL', url+'/flow'):
                     pipeline = TrafficAnalysts({'model': 'fixture', 'tomtom_key': 'fixture-key',
                                                 'ollama_url': url, 'history_csv': str(history)})
                     pipeline.historical.dataset = HistoricalDataset(history, folder/'cache')

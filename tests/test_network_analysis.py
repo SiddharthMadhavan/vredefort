@@ -1,9 +1,9 @@
 from concurrent.futures import CancelledError
 import unittest
 
-from citycollapse.data import Road
-from citycollapse.live_traffic import AnalysisCancel
-from citycollapse.network_analysis import network_facts
+from vredefort.data import Road
+from vredefort.live_traffic import AnalysisCancel
+from vredefort.network_analysis import network_facts
 from agent_fixture import fixture_network
 
 

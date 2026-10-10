@@ -8,20 +8,20 @@ import time
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.analysis_scope import AnalysisScope, connected_roads
-from citycollapse.app import CityCollapseApp
-from citycollapse.explore_map import nearest_road
-from citycollapse.historical_traffic import HistoricalDataset
-from citycollapse.live_traffic import road_context, sample_road
-from citycollapse.traffic_agents import TrafficAnalysts
+from vredefort.analysis_scope import AnalysisScope, connected_roads
+from vredefort.app import VredefortApp
+from vredefort.explore_map import nearest_road
+from vredefort.historical_traffic import HistoricalDataset
+from vredefort.live_traffic import road_context, sample_road
+from vredefort.traffic_agents import TrafficAnalysts
 from agent_fixture import fixture_server
 from history_fixture import write_history
 
 
 with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.15) as (url, requests), \
-        patch('citycollapse.live_traffic.FLOW_URL', url+'/flow'):
+        patch('vredefort.live_traffic.FLOW_URL', url+'/flow'):
     folder = Path(temporary)
-    app = CityCollapseApp()
+    app = VredefortApp()
     started = time.monotonic()
     stage, failures = 'startup', []
     node_id = core = None

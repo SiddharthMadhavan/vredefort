@@ -6,9 +6,9 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
+from vredefort.app import VredefortApp
 
-app = CityCollapseApp()
+app = VredefortApp()
 started = time.monotonic()
 stage, failures = 'startup', []
 road_id = 'kml_merged_e_19725_0_1'

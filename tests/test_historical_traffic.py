@@ -7,9 +7,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from citycollapse.historical_traffic import HistoricalDataset, HistoricalTrafficAnalyst
-from citycollapse.live_traffic import AnalysisCancel
-from citycollapse.traffic_agents import TrafficAnalysts
+from vredefort.historical_traffic import HistoricalDataset, HistoricalTrafficAnalyst
+from vredefort.live_traffic import AnalysisCancel
+from vredefort.traffic_agents import TrafficAnalysts
 from agent_fixture import fixture_network, fixture_server
 from history_fixture import write_history
 
@@ -33,7 +33,7 @@ class HistoricalTests(unittest.TestCase):
             self.network, 'e0', AnalysisCancel(), lambda *args: None, self.live)
 
     def test_bundled_history_reuses_index_across_extraction_directories(self):
-        from citycollapse import historical_traffic
+        from vredefort import historical_traffic
         cancel = AnalysisCancel()
         with patch('sys.frozen', True, create=True), patch.object(historical_traffic, 'DEFAULT_HISTORY', self.path):
             original = self.dataset.index(cancel, lambda *args: None)
@@ -120,7 +120,7 @@ class HistoricalTests(unittest.TestCase):
         self.assertFalse(list(self.dataset.cache_dir.glob('*.building')))
 
     def test_both_agents_share_fetch_and_ground_separate_ollama_calls(self):
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             agents = TrafficAnalysts({**self.config, 'tomtom_key': 'fixture-key', 'ollama_url': url})
             agents.historical.dataset = self.dataset
             events = []
@@ -130,7 +130,7 @@ class HistoricalTests(unittest.TestCase):
         self.assertEqual(len(prompts), 5)
         self.assertIn('Live Traffic Analyst', prompts[0]['messages'][0]['content'])
         self.assertIn('Historical Traffic Analyst', prompts[1]['messages'][0]['content'])
-        self.assertIn('synthetic', prompts[1]['messages'][0]['content'].lower())
+        self.assertIn("Vredefort's Historical Traffic Analyst", prompts[1]['messages'][0]['content'])
         payload = json.loads(prompts[1]['messages'][1]['content'])
         evidence = next(value['value'] for kind, value in events if
                         kind == 'agent_event' and value['agent'] == 'historical' and value['kind'] == 'evidence')

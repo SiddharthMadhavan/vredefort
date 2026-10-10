@@ -7,8 +7,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from citycollapse import config, user_settings
-from citycollapse.app import CityCollapseApp
+from vredefort import config, user_settings
+from vredefort.app import VredefortApp
 
 
 class UserSettingsTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class UserSettingsTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == 'win32', 'Windows DPAPI')
     def test_saved_keys_override_env_and_clearing_disables_legacy_alias(self):
-        (self.folder / '.env').write_text('TOMTOM_API_KEY=old-key\nCITYCOLLAPSE_TOMTOM_API_KEY=legacy-key\nVITE_CARTO_API_KEY=old-carto')
+        (self.folder / '.env').write_text('TOMTOM_API_KEY=old-key\nVREDEFORT_TOMTOM_API_KEY=legacy-key\nVITE_CARTO_API_KEY=old-carto')
         with patch.dict(os.environ, {}, clear=True):
             user_settings.save_user_settings({'TOMTOM_API_KEY': 'new-key', 'VITE_CARTO_API_KEY': 'new-carto'})
             self.assertEqual(config.analyst_settings()['tomtom_key'], 'new-key')
@@ -55,7 +55,7 @@ class UserSettingsTests(unittest.TestCase):
 
     def test_plaintext_section_cannot_supply_keys_or_unrelated_configuration(self):
         user_settings.SETTINGS_FILE.write_text(json.dumps({'values': {
-            'TOMTOM_API_KEY': 'not-protected', 'OLLAMA_MODEL': 'model', 'CITYCOLLAPSE_MAP_PATH': 'unexpected'}}))
+            'TOMTOM_API_KEY': 'not-protected', 'OLLAMA_MODEL': 'model', 'VREDEFORT_MAP_PATH': 'unexpected'}}))
         self.assertEqual(user_settings.read_user_settings(), {'OLLAMA_MODEL': 'model'})
 
     @unittest.skipUnless(sys.platform == 'win32', 'Windows DPAPI')
@@ -70,18 +70,18 @@ class UserSettingsTests(unittest.TestCase):
     def test_validation_accepts_optional_keys_and_rejects_bad_connections(self):
         valid = {'TOMTOM_API_KEY': '', 'VITE_CARTO_API_KEY': '',
                  'OLLAMA_BASE_URL': 'http://127.0.0.1:11434', 'OLLAMA_MODEL': 'llama3.1:8b'}
-        CityCollapseApp.validate_connection_settings(valid)
+        VredefortApp.validate_connection_settings(valid)
         for override in ({'OLLAMA_BASE_URL': 'file:///invalid'}, {'OLLAMA_MODEL': ''},
                          {'TOMTOM_API_KEY': 'contains\na-newline'}):
             with self.assertRaises(ValueError):
-                CityCollapseApp.validate_connection_settings({**valid, **override})
+                VredefortApp.validate_connection_settings({**valid, **override})
 
     def test_new_map_key_replaces_embedded_carto_key(self):
-        result = config.settings({'CITYCOLLAPSE_TILE_URL': 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=old',
+        result = config.settings({'VREDEFORT_TILE_URL': 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=old',
                                   'VITE_CARTO_API_KEY': 'new'})
         self.assertIn('key=new', result['tile_url'])
         self.assertNotIn('key=old', result['tile_url'])
-        result = config.settings({'CITYCOLLAPSE_TILE_URL': result['tile_url'], 'VITE_CARTO_API_KEY': ''})
+        result = config.settings({'VREDEFORT_TILE_URL': result['tile_url'], 'VITE_CARTO_API_KEY': ''})
         self.assertNotIn('key=', result['tile_url'])
 
 

@@ -1,6 +1,6 @@
 import unittest
 
-from citycollapse.markdown_text import markdown_runs
+from vredefort.markdown_text import markdown_runs
 
 
 class MarkdownTests(unittest.TestCase):

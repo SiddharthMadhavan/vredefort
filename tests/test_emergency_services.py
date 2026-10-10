@@ -6,12 +6,12 @@ from types import SimpleNamespace
 import unittest
 from PIL import Image
 
-from citycollapse.data import Road, SpatialIndex
-from citycollapse.geometry import project
-from citycollapse.emergency_services import EmergencyAccessModel, road_projection, nearest_road
-from citycollapse.emergency_rendering import paint_emergency, visible_risks, route_paths, trim_paths, paint_emergency_route
-from citycollapse.map_renderer import Camera
-from citycollapse.simulation_data import load_simulation_data
+from vredefort.data import Road, SpatialIndex
+from vredefort.geometry import project
+from vredefort.emergency_services import EmergencyAccessModel, road_projection, nearest_road
+from vredefort.emergency_rendering import paint_emergency, visible_risks, route_paths, trim_paths, paint_emergency_route
+from vredefort.map_renderer import Camera
+from vredefort.simulation_data import load_simulation_data
 from test_traffic import model_fixture
 
 

@@ -14,15 +14,15 @@ from unittest.mock import patch
 from PIL import Image, ImageGrab
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from citycollapse.app import CityCollapseApp
-from citycollapse import config
+from vredefort.app import VredefortApp
+from vredefort import config
 
 
 with tempfile.TemporaryDirectory() as temporary, \
         patch.object(config, 'MAP_PREFERENCES', Path(temporary) / 'preferences.json'), \
-        patch.dict(os.environ, {'CITYCOLLAPSE_MAP_OFFLINE': 'true', 'CITYCOLLAPSE_MAP_PATH': ''}), \
+        patch.dict(os.environ, {'VREDEFORT_MAP_OFFLINE': 'true', 'VREDEFORT_MAP_PATH': ''}), \
         patch('urllib.request.urlopen', side_effect=AssertionError('Offline GUI attempted HTTP')) as http:
-    app = CityCollapseApp()
+    app = VredefortApp()
     started, stage, failures = time.monotonic(), 'startup', []
     spies = []
 

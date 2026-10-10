@@ -1,4 +1,4 @@
-CityCollapse: synthetic hourly traffic and conditional closure assignment
+Vredefort: synthetic hourly traffic and conditional closure assignment
 
 INPUTS AND UNITS
 The supplied CSV is synthetic, with one record per KML graph edge per hour.

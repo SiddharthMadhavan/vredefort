@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import unittest
 
 from test_traffic import model_fixture
-from citycollapse.comparison import comparison_metrics, format_metric
-from citycollapse.presentation import display_evidence, display_text
+from vredefort.comparison import comparison_metrics, format_metric
+from vredefort.presentation import display_evidence, display_text
 
 
 def report_for(result, facilities=()):

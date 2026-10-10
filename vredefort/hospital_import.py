@@ -1,6 +1,6 @@
 """Repeatable, offline import of the supplied Bengaluru healthcare KMLs.
 
-Run python -m citycollapse.hospital_import --uphc FILE --clinics FILE
+Run python -m vredefort.hospital_import --uphc FILE --clinics FILE
     --referral FILE --output data
 Coordinates come only from KML Point geometry, never address guesses.
 """

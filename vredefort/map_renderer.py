@@ -145,7 +145,7 @@ class TileCache:
         finally:
             if db is not None:
                 db.close()
-        request = urllib.request.Request(self.url.format(z=z, x=x, y=y), headers={'User-Agent': 'CityCollapse-desktop/1.0'})
+        request = urllib.request.Request(self.url.format(z=z, x=x, y=y), headers={'User-Agent': 'Vredefort-desktop/1.0'})
         with urllib.request.urlopen(request, timeout=6) as response:
             payload = response.read(2_000_001)
         if len(payload) > 2_000_000:

@@ -2,9 +2,9 @@ from dataclasses import replace
 from types import SimpleNamespace
 import unittest
 
-from citycollapse.map_renderer import Camera
-from citycollapse.traffic import LinkState
-from citycollapse.traffic_rendering import paint_heatmap, paint_traffic, congestion_hotspots
+from vredefort.map_renderer import Camera
+from vredefort.traffic import LinkState
+from vredefort.traffic_rendering import paint_heatmap, paint_traffic, congestion_hotspots
 
 
 class HeatmapTests(unittest.TestCase):

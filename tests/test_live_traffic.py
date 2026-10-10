@@ -4,7 +4,7 @@ from threading import Event, Thread
 import unittest
 from unittest.mock import patch
 
-from citycollapse.live_traffic import AnalysisCancel, LiveTrafficAnalyst, normalize_flow, road_context, sample_road
+from vredefort.live_traffic import AnalysisCancel, LiveTrafficAnalyst, normalize_flow, road_context, sample_road
 from agent_fixture import fixture_network, fixture_server
 
 
@@ -33,7 +33,7 @@ class AnalystTests(unittest.TestCase):
             self.assertNotIn('currentSpeed', sample)
 
     def test_http_collection_and_ollama_stream_are_grounded(self):
-        with fixture_server() as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server() as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             events = []
             LiveTrafficAnalyst({**self.config, 'ollama_url': url}).analyze(
                 self.network, 'e0', AnalysisCancel(), lambda *event: events.append(event))
@@ -53,7 +53,7 @@ class AnalystTests(unittest.TestCase):
         self.assertEqual(events[-1][0], 'done')
 
     def test_quota_error_stops_more_provider_calls_and_remains_unknown(self):
-        with fixture_server(flow_status=429) as (url, requests), patch('citycollapse.live_traffic.FLOW_URL', url + '/flow'):
+        with fixture_server(flow_status=429) as (url, requests), patch('vredefort.live_traffic.FLOW_URL', url + '/flow'):
             evidence = LiveTrafficAnalyst(self.config).collect_evidence(
                 self.network, 'e0', AnalysisCancel(), lambda *args: None)
         self.assertEqual(len(requests), 1)

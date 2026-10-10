@@ -1,10 +1,10 @@
 from dataclasses import replace
 import unittest
-from citycollapse.data import Road, SpatialIndex, DATA
-from citycollapse.simulation_data import load_simulation_data
-from citycollapse.geometry import project
-from citycollapse.impacts import nearby_facilities, build_impact_report
-from citycollapse.traffic import TrafficDataset, TrafficModel
+from vredefort.data import Road, SpatialIndex, DATA
+from vredefort.simulation_data import load_simulation_data
+from vredefort.geometry import project
+from vredefort.impacts import nearby_facilities, build_impact_report
+from vredefort.traffic import TrafficDataset, TrafficModel
 from test_traffic import model_fixture
 
 

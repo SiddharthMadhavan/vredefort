@@ -1,1 +1,0 @@
-"""CityCollapse native desktop application."""

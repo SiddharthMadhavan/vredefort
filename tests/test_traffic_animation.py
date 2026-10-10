@@ -2,7 +2,7 @@ import math
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
-from citycollapse.traffic_animation import (FlowPath, clip_segment, visible_paths,
+from vredefort.traffic_animation import (FlowPath, clip_segment, visible_paths,
                                             point_at, trail_segments, path_slice, FlowLayer)
 
 
