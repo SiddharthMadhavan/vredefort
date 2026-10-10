@@ -373,9 +373,10 @@ class SimulationController:
         self.focus_points([point['point']])
         self.app.detail_title.configure(text=facility.name)
         self.app.clear_body()
-        self.app.detail_text(f'{facility.kind.upper()}\n{facility.distance_m:.0f}m from affected road\nPotential access delay; no outage inferred.')
+        self.app.detail_text(f'{point.get("Type") or facility.kind.upper()}\n{facility.distance_m:.0f}m from affected road\nPotential access delay; no outage inferred.')
         self.app.detail_text(f'Coordinate provenance: {point.get("match_status", "supplied dataset")}\n'
-                             f'Address: {point.get("Address") or point.get("matched_address") or "Unavailable"}', True)
+                             f'Address: {point.get("Address") or point.get("matched_address") or "Unavailable"}\n'
+                             f'Ward: {point.get("Ward") or "Unavailable"}\nZone: {point.get("Zone") or "Unavailable"}', True)
 
     def preview_route(self, option):
         self.active_diversion = option

@@ -114,7 +114,14 @@ def run_self_test(report_path):
                 emergency = sim.emergency.current_report
                 assert len(emergency.points) == len(app.network.nodes) * 2
                 assert emergency.anchors and sim.emergency.panel.report is emergency
+                assert len(sim.datasets['hospitals']) == 255
+                assert len(emergency.anchors) == len(sim.datasets['hospitals']) + len(sim.datasets['fire'])
+                assert not emergency.skipped
+                assert all(p.entrance_point is not None for p in emergency.locations)
+                assert all(p['match_status'] == 'provided_kml_coordinates' for p in sim.datasets['hospitals'])
+                report['healthcare_locations'] = len(sim.datasets['hospitals'])
                 report.update(emergency_access=True, emergency_facilities=len(emergency.anchors))
+                report['nearest_road_entrances'] = True
                 point = next(p for p in emergency.points if p.kind == 'hospitals' and p.facility and p.status == 'delayed')
                 sim.emergency.focus(point)
                 stage = 'emergency_route'

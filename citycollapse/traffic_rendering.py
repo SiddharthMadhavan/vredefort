@@ -206,8 +206,9 @@ def paint_impacts(image, camera, view, geometry, report, diversion, datasets, bl
             if -16 <= x <= camera.width + 16 and -16 <= y <= camera.height + 16:
                 draw.ellipse((x - 12, y - 12, x + 12, y + 12), outline='#efb65f', width=2)
                 draw.rectangle((x - 7, y - 7, x + 7, y + 7), fill='#14251a', outline='#efb65f')
-                if facility.kind == 'hospitals':
+                if facility.kind == 'hospitals' and facility.facility_category not in ('uphc', 'clinics'):
                     draw.line((x - 4, y, x + 4, y), fill='#d4e8d4')
                     draw.line((x, y - 4, x, y + 4), fill='#d4e8d4')
                 else:
-                    draw.text((x, y + 1), 'F', fill='#efb65f', font=font, anchor='mm')
+                    symbol = 'F' if facility.kind == 'fire' else {'uphc': 'P', 'clinics': 'C'}[facility.facility_category]
+                    draw.text((x, y + 1), symbol, fill='#efb65f', font=font, anchor='mm')

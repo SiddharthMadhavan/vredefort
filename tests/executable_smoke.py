@@ -20,5 +20,7 @@ with tempfile.TemporaryDirectory() as working:
     assert completed.returncode == 0 and result['status'] == 'passed', result
     assert result['frozen'] and result['bundled_env_absent'] and result['persistent_cache']
     assert result['emergency_access'] and result['emergency_route'] and result['app_title'].startswith('vredefort')
+    assert result['healthcare_locations'] == 255
+    assert result['nearest_road_entrances'] and result['emergency_facilities'] == 276
     print('Executable smoke passed: standalone launch, bundled graph/fonts/datasets, '
           'encrypted API settings, validation, key clearing, simulation, road closure, emergency access and title.', flush=True)

@@ -246,7 +246,7 @@ class ComparisonView:
                 cell.configure(text=text)
         lines = ['NEARBY FACILITIES / POTENTIAL ACCESS DELAY',
                  f'Within {sim.report.radius_m:.0f}m of closed or extra-loaded roads. No outage or measured delay inferred.', '']
-        lines += [f'{facility.name} / {facility.distance_m:.0f}m / '
+        lines += [f'{facility.name} / {facility.facility_type} / {facility.distance_m:.0f}m / '
                   f'{"closure" if facility.near_closed else "extra traffic"}' for facility in sim.report.facilities]
         if not sim.report.facilities:
             lines.append('No mapped facilities within the impact buffer.')

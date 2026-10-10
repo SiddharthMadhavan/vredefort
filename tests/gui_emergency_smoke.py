@@ -49,7 +49,10 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                     app.after(60, check)
                     return
                 report = emergency.report
-                assert len(report.points) == 6618 and len(report.anchors) == 39
+                assert len(report.points) == 6618
+                assert len(report.anchors) + len(report.skipped) == len(sim.datasets['hospitals']) + len(sim.datasets['fire'])
+                assert len([p for p in report.locations if p.kind == 'hospitals']) == 255
+                assert not report.skipped and len(report.anchors) == 276
                 assert emergency.window.title() == 'vredefort / Emergency services'
                 assert emergency.panel.report is report and emergency.panel.rows
                 assert sim.bitmap.tobytes() != baseline_pixels
@@ -90,7 +93,7 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                     return
                 route = emergency.current_route
                 paths = route_paths(app.network, route)
-                points = [route.facility.point, route.point, *(p for path in paths for p in path)]
+                points = [route.facility.entrance_point, route.point, *(p for path in paths for p in path)]
                 assert all(app.details.winfo_width() + 20 <= app.camera.screen(p)[0] <= app.camera.width - 20
                            and 20 <= app.camera.screen(p)[1] <= app.camera.height - 20 for p in points)
                 assert app.canvas.itemcget(sim.item, 'state') == 'normal'
@@ -135,8 +138,8 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
             elif stage == 'playback':
                 assert sim.running and sim.elapsed > .2
                 sim.toggle_play()
-                emergency.panel.kind.set('Hospital access')
-                emergency.panel.change_kind('Hospital access')
+                emergency.panel.kind.set('Healthcare access')
+                emergency.panel.change_kind('Healthcare access')
                 assert emergency.kind == 'hospitals'
                 point = next(p for p in emergency.report.risks('hospitals') if p.facility)
                 emergency.focus(point)
@@ -152,6 +155,7 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                 point = next(p for p in emergency.report.points if (p.kind, p.node_id) == emergency.selected_target)
                 assert emergency.current_route.seconds == point.seconds
                 assert emergency.current_route.facility == point.facility
+                assert emergency.current_route.facility.facility_type in ('Urban primary health centre', 'Namma Clinic', 'Referral hospital')
                 emergency.window.deiconify()
                 emergency.window.lift()
                 stage = 'capture'
@@ -163,6 +167,16 @@ with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
                 assert emergency.panel.assumptions.winfo_height() >= 90 * emergency.panel._get_widget_scaling()
                 ImageGrab.grab(window=emergency.window.winfo_id()).save('.tmp/emergency-panel-smoke.png')
                 emergency.window.withdraw()
+                location = next(p for p in emergency.report.locations if p.kind == 'hospitals' and p.category == 'clinics')
+                emergency.focus_location(location)
+                assert app.detail_title.cget('text') == location.name
+                assert app.selection is None and emergency.current_route is None
+                anchor = next(a for a in emergency.report.anchors if a.kind == 'hospitals' and a.distance_m > 250)
+                location = next(p for p in emergency.report.locations if (p.kind, p.index) == (anchor.kind, anchor.index))
+                sim.focus_points([location.map_point])
+                assert emergency.pick(*app.camera.screen(location.map_point))
+                assert app.detail_title.cget('text') == location.name
+                assert location.map_point == anchor.entrance_point and location.point != location.map_point
                 app.geometry('760x520')
                 stage = 'compact'
                 app.after(400, check)

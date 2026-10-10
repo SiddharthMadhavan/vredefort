@@ -24,14 +24,14 @@ class EmergencyPanel(ctk.CTkFrame):
             command=self.toggle_overlay, text_color='#abd2ad', checkbox_width=18, checkbox_height=18)
         self.overlay.pack(side='left')
         self.overlay.select()
-        self.kind = ctk.CTkOptionMenu(actions, values=['All services', 'Fire stations', 'Hospital access'],
+        self.kind = ctk.CTkOptionMenu(actions, values=['All services', 'Fire stations', 'Healthcare access'],
             command=self.change_kind, font=app.small_font, dropdown_font=app.small_font,
             fg_color='#15251a', button_color='#3d5943', text_color='#abd2ad')
         self.kind.pack(side='right')
         self.summary = ctk.CTkLabel(self, text='Calculating access...', justify='left', anchor='w',
             font=app.small_font, text_color='#abd2ad', wraplength=430)
         self.summary.pack(fill='x', padx=16, pady=5)
-        ctk.CTkLabel(self, text='RED: lost access / ORANGE: over 10 min\nGOLD: +3 min delay / PURPLE: existing graph gap\nF: fire station / H: hospital location',
+        ctk.CTkLabel(self, text='RED: lost access / ORANGE: over 10 min\nGOLD: +3 min delay / PURPLE: existing graph gap\nF: fire / H: referral hospital / P: UPHC / C: clinic',
             justify='left', anchor='w', font=app.small_font, text_color='#c6b6a2').pack(fill='x', padx=16, pady=4)
         self.body = ctk.CTkScrollableFrame(self, fg_color='transparent', scrollbar_button_color='#3d5943')
         self.body._scrollbar.configure(height=80)
@@ -47,10 +47,14 @@ class EmergencyPanel(ctk.CTkFrame):
         self.assumptions = ctk.CTkTextbox(self, height=100, font=app.small_font,
             text_color='#819487', fg_color='transparent', wrap='word', corner_radius=0)
         self.assumptions.insert('1.0', 'Road-travel estimates only. 10 min / +3 min are demo thresholds, not response standards. '
-            'Hospital locations are access destinations, not verified ambulance bases. '
-            'Only supplied mapped facilities are included (some coordinates are inferred). '
+            'Healthcare locations are access destinations, not verified ambulance bases. '
+            'UPHCs and clinics are not assumed to provide hospital emergency care. '
+            'Original KML coordinates are retained. Markers and routes use the nearest-road entrance, '
+            'inferred from road geometry without a distance cutoff, not a surveyed driveway. '
+            'Facility capacity and availability are unverified. '
             'Undirected roads; dispatch, capacity, legal turns and off-road travel are unknown. '
             'A facility on a blocked access road has no usable entry in that scenario. '
+            'Gray markers indicate that no usable road geometry is available. '
             'Nearby markers are thinned on the map; all flagged junctions are listed above.')
         self.assumptions.configure(state='disabled')
         self.body.pack_forget()
@@ -64,7 +68,7 @@ class EmergencyPanel(ctk.CTkFrame):
         self.controller.update_button()
 
     def change_kind(self, value):
-        self.controller.kind = {'All services': None, 'Fire stations': 'fire', 'Hospital access': 'hospitals'}[value]
+        self.controller.kind = {'All services': None, 'Fire stations': 'fire', 'Healthcare access': 'hospitals'}[value]
         if self.controller.selected_target and self.controller.kind not in (None, self.controller.selected_target[0]):
             self.controller.selected_target = self.controller.route = None
         self.page = 0
@@ -100,8 +104,8 @@ class EmergencyPanel(ctk.CTkFrame):
         self.summary.configure(text=f'{self.controller.sim.model.dataset.hours[r.hour][:16]} / simulation\n'
             f'{len({p.node_id for p in points})} flagged junctions / {len(points)} service flags\n'
             f'{counts["lost"]} lost / {counts["delayed"]} slow / {counts["degraded"]} added delay\n'
-            f'{counts["gap"]} existing gaps / {facilities} mapped facilities\n'
-            f'{excluded} facilities excluded: no road within 250m')
+            f'{counts["gap"]} existing gaps / {facilities} nearest-road entrances\n'
+            f'{excluded} facilities without usable road geometry')
         pages = max(1, (len(points) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
         self.page = min(self.page, pages - 1)
         self.previous.configure(state='normal' if self.page else 'disabled')
@@ -112,7 +116,7 @@ class EmergencyPanel(ctk.CTkFrame):
             text = (f'Junction {point.number} / {SERVICE_NAMES[point.kind]}\n{STATUS_NAMES[point.status]} / {minutes(point.seconds)}\n'
                     f'Baseline {minutes(point.baseline_seconds)}' +
                     (f' / +{added / 60:.1f} min' if added is not None and math.isfinite(added) else '') +
-                    f'\n{point.facility.name[:51] if point.facility else "No reachable mapped facility"}')
+                    f'\n{(point.facility.name + " / " + point.facility.facility_type)[:51] if point.facility else "No reachable mapped facility"}')
             button = ctk.CTkButton(self.body, text=text, command=lambda p=point: self.controller.focus(p),
                 font=self.small_font, text_color=COLORS[point.status], fg_color='#15251a',
                 hover_color='#233d29', anchor='w', corner_radius=2, height=92)

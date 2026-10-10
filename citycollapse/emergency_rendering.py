@@ -62,17 +62,8 @@ def paint_emergency_route(image, camera, network, route):
                                (x - ux * 7 + uy * 4, y - uy * 7 - ux * 4)), fill='#ffffff', width=2)
                 remaining += 110
             remaining -= distance
-    # This is a coordinate snap, not a surveyed driveway or routable connector.
-    origin = camera.screen(route.facility.point)
-    road_start = camera.screen(paths[0][0]) if paths else camera.screen(route.point)
-    distance = math.dist(origin, road_start)
-    if distance:
-        for offset in range(0, math.ceil(distance), 10):
-            end = min(distance, offset + 4)
-            draw.line(tuple((origin[0] + t / distance * (road_start[0] - origin[0]),
-                             origin[1] + t / distance * (road_start[1] - origin[1])) for t in (offset, end)),
-                      fill='#63efff', width=2)
-    for world, label in ((route.facility.point, 'H' if route.facility.kind == 'hospitals' else 'F'),
+    # Facility markers and routes share the inferred nearest-road entrance.
+    for world, label in ((route.facility.entrance_point, route.facility.marker),
                          (route.point, 'J')):
         x, y = camera.screen(world)
         draw.ellipse((x - 11, y - 11, x + 11, y + 11), fill='#102b30', outline='#63efff', width=3)
@@ -111,10 +102,12 @@ def paint_emergency(image, camera, report, kind=None):
         if point.status == 'lost':
             draw.ellipse((x - 7, y - 7, x + 7, y + 7), outline=COLORS[point.status], width=2)
     font = ImageFont.truetype(str(FONT_FILE), 17) if FONT_FILE.exists() else ImageFont.load_default()
-    for anchor in report.anchors:
+    attached = {(a.kind, a.index) for a in report.anchors}
+    for anchor in report.locations:
         if kind and anchor.kind != kind:
             continue
-        x, y = camera.screen(anchor.point)
+        x, y = camera.screen(anchor.map_point)
         if -12 <= x <= camera.width + 12 and -12 <= y <= camera.height + 12:
-            draw.rectangle((x - 7, y - 9, x + 7, y + 9), fill='#11221ef0', outline='#9bdcd5', width=1)
-            draw.text((x - 4, y - 8), 'F' if anchor.kind == 'fire' else 'H', font=font, fill='#9bdcd5')
+            color = '#9bdcd5' if (anchor.kind, anchor.index) in attached else '#8d949b'
+            draw.rectangle((x - 7, y - 9, x + 7, y + 9), fill='#11221ef0', outline=color, width=1)
+            draw.text((x - 4, y - 8), anchor.marker, font=font, fill=color)

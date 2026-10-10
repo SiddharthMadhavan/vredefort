@@ -8,7 +8,7 @@ from PIL import Image
 
 from citycollapse.data import Road, SpatialIndex
 from citycollapse.geometry import project
-from citycollapse.emergency_services import EmergencyAccessModel
+from citycollapse.emergency_services import EmergencyAccessModel, road_projection, nearest_road
 from citycollapse.emergency_rendering import paint_emergency, visible_risks, route_paths, trim_paths, paint_emergency_route
 from citycollapse.map_renderer import Camera
 from citycollapse.simulation_data import load_simulation_data
@@ -104,16 +104,68 @@ class EmergencyTests(unittest.TestCase):
         blocked = analyzer.analyze(baseline, model.solve(0, blocked_nodes={'a'}))
         self.assertEqual(next(p.status for p in blocked.points if p.node_id == 'a' and p.kind == 'fire'), 'lost')
 
-    def test_fastest_facility_can_change_and_far_facilities_are_excluded(self):
+    def test_fastest_facility_can_change_and_far_facilities_use_nearest_road(self):
         model, data = fixture([('ab', 'a', 'b', 1000), ('bc', 'b', 'c', 100)],
             {'a': (77.59, 13), 'b': (77.60, 13), 'c': (77.61, 13)},
             [('fire', 'West', (77.59, 13)), ('fire', 'East', (77.61, 13)), ('fire', 'Far', (78, 14))])
         analyzer, baseline = EmergencyAccessModel(model, data), model.solve(0)
         r = analyzer.analyze(baseline, baseline)
-        self.assertEqual(len(r.skipped), 1)
+        self.assertEqual(len(r.skipped), 0)
+        self.assertEqual(len(r.anchors), 3)
+        self.assertEqual(len(r.locations), 3)
+        far = r.anchors[2]
+        self.assertEqual(far.point, project(78, 14))
+        self.assertEqual(far.entrance_point, project(77.61, 13))
+        self.assertGreater(far.distance_m, 250)
+        self.assertEqual(r.locations[2].map_point, far.entrance_point)
+        self.assertEqual(data['fire'][2]['coordinate'], (78, 14))
+        image = Image.new('RGBA', (100, 100))
+        paint_emergency(image, Camera(*project(78, 14), 15, 100, 100), r, 'fire')
+        self.assertIsNone(image.getbbox(), 'Facility should appear at its entrance, not its original off-road location')
+        paint_emergency(image, Camera(*far.entrance_point, 15, 100, 100), r, 'fire')
+        self.assertEqual(image.getpixel((43, 41))[:3], (155, 220, 213))
         self.assertEqual(next(p.facility.name for p in r.points if p.node_id == 'b' and p.kind == 'fire'), 'East')
         r = analyzer.analyze(baseline, model.solve(0, {'bc'}))
         self.assertEqual(next(p.facility.name for p in r.points if p.node_id == 'b' and p.kind == 'fire'), 'West')
+
+    def test_off_road_midpoint_entrance_preserves_source_and_partial_route(self):
+        model, data = fixture([('ab', 'a', 'b', 1000)], {'a': (77.6, 13), 'b': (77.61, 13)},
+                              [('hospitals', 'Hospital', (77.605, 13.01))])
+        analyzer, baseline = EmergencyAccessModel(model, data), model.solve(0)
+        anchor = analyzer.anchors[0]
+        self.assertGreater(anchor.distance_m, 1000)
+        self.assertAlmostEqual(anchor.fraction, .5)
+        self.assertEqual(anchor.point, project(77.605, 13.01))
+        self.assertAlmostEqual(math.dist(anchor.entrance_point, project(77.605, 13)), 0, places=12)
+        report = analyzer.analyze(baseline, baseline)
+        point = next(p for p in report.points if p.kind == 'hospitals' and p.node_id == 'b')
+        network = SimpleNamespace(roads_by_id={r.id: r for r in data['views']['KML road graph']['roads']},
+                                  nodes_by_id={n['id']: n for n in data['graph']['nodes']})
+        paths = route_paths(network, report.route(point))
+        self.assertAlmostEqual(math.dist(paths[0][0], anchor.entrance_point), 0, places=12)
+        self.assertAlmostEqual(point.seconds, 50)
+        closed = analyzer.analyze(baseline, model.solve(0, {'ab'}))
+        self.assertTrue(all(p.status == 'lost' for p in closed.points if p.kind == 'hospitals'))
+
+    def test_nearest_search_checks_polyline_not_just_bounds_or_endpoints(self):
+        point = (0., 0.)
+        misleading = Road('far', {}, (((-2., 0.), (-2., 2.), (2., 2.)),), (-2., 0., 2., 2.))
+        nearest = Road('near', {}, (((-10., .1), (10., .1)),), (-10., .1, 10., .1))
+        distance, fraction, entrance, road = nearest_road(point, (misleading, nearest))
+        self.assertEqual(road.id, 'near')
+        self.assertAlmostEqual(distance, .01)
+        self.assertAlmostEqual(fraction, .5)
+        self.assertEqual(entrance, (0., .1))
+        # An explicit caller cutoff remains available; the app uses no cutoff.
+        model, data = fixture([('ab', 'a', 'b', 1000)], {'a': (77.6, 13), 'b': (77.61, 13)},
+                              [('fire', 'Station', (77.605, 13.01))])
+        limited = EmergencyAccessModel(model, data, snap_radius_m=250)
+        self.assertEqual(len(limited.skipped), 1)
+        self.assertEqual(limited.locations[0].map_point, project(77.605, 13.01))
+        data['views']['KML road graph']['roads'] = []
+        empty = EmergencyAccessModel(model, data)
+        self.assertEqual(len(empty.skipped), 1)
+        self.assertFalse(empty.anchors)
 
     def test_partial_geometry_preserves_bends_direction_and_reversed_road(self):
         curve = (((0., 0.), (1., 0.), (1., 1.)),)
@@ -159,12 +211,26 @@ class ActualEmergencyTests(unittest.TestCase):
         baseline = self.model.solve(8)
         result = self.analyzer.analyze(baseline, self.model.solve(8, {'kml_merged_e_8287_0_22'}))
         self.assertEqual(len(result.points), len(self.data['graph']['nodes']) * 2)
-        self.assertEqual(len(result.anchors) + len(result.skipped), 46)
+        self.assertEqual(len(result.anchors) + len(result.skipped), len(self.data['hospitals']) + len(self.data['fire']))
+        self.assertEqual(len(result.locations), len(result.anchors) + len(result.skipped))
+        self.assertFalse(result.skipped)
+        self.assertEqual(len(result.anchors), 276)
         for anchor in result.anchors:
             self.assertIn(anchor.edge_id, baseline.links)
-            self.assertLessEqual(anchor.distance_m, 250)
+            record = self.data[anchor.kind][anchor.index]
+            self.assertEqual(anchor.point, tuple(record['point']))
+            road = self.data['views']['KML road graph']['by_id'][anchor.edge_id]
+            self.assertLess(road_projection(anchor.entrance_point, road)[0], 1e-24)
         for point in result.points:
             self.assertGreaterEqual(point.seconds + 1e-8, point.baseline_seconds)
+
+    def test_formerly_excluded_facilities_use_globally_nearest_polyline(self):
+        roads = self.data['views']['KML road graph']['roads']
+        for kind in ('hospitals', 'fire'):
+            anchor = max((a for a in self.analyzer.anchors if a.kind == kind), key=lambda a: a.distance_m)
+            self.assertGreater(anchor.distance_m, 250)
+            expected = min(roads, key=lambda road: road_projection(anchor.point, road)[0])
+            self.assertEqual(anchor.edge_id, expected.id)
 
     def test_actual_routes_reproduce_every_travel_time_and_avoid_closures(self):
         baseline = self.model.solve(8)

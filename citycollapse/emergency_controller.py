@@ -5,6 +5,7 @@ import customtkinter as ctk
 from .emergency_services import EmergencyAccessModel, SERVICE_NAMES, STATUS_NAMES
 from .emergency_panel import EmergencyPanel, minutes
 from .presentation import display_text
+from .geometry import unproject
 
 
 class EmergencyController:
@@ -117,7 +118,7 @@ class EmergencyController:
             if self.route:
                 from .emergency_rendering import route_paths
                 paths = route_paths(app.network, self.route)
-                self.sim.fit_points([point.point, self.route.facility.point, *(p for path in paths for p in path)])
+                self.sim.fit_points([point.point, self.route.facility.entrance_point, *(p for path in paths for p in path)])
             else:
                 self.sim.focus_points([point.point])
                 from dataclasses import replace
@@ -134,21 +135,49 @@ class EmergencyController:
                         (f'Added road travel: {minutes(added)}\n' if added is not None else 'No baseline coverage\n'))
         if point.facility:
             facility = point.facility
-            app.detail_text(f'Fastest mapped facility: {facility.name}\n'
+            app.detail_text(f'Fastest mapped facility: {facility.name}\nFacility type: {facility.facility_type}\n'
                 f'Coordinate provenance: {facility.provenance}\nRoad snap distance: {facility.distance_m:.0f}m\n'
-                'Dotted cyan: approximate facility-to-road snap.\nOff-road and dispatch time excluded.', True)
+                'Route starts at the nearest-road entrance.\nEntrance is inferred; original coordinates retained.\n'
+                'Off-road and dispatch time excluded.', True)
         if point.baseline_facility and point.baseline_facility != point.facility:
             app.detail_text(f'Baseline facility: {point.baseline_facility.name}', True)
 
     def pick(self, x, y):
         if not self.current_report:
             return False
+        for location in self.current_report.locations:
+            if self.kind and location.kind != self.kind:
+                continue
+            sx, sy = self.sim.app.camera.screen(location.map_point)
+            if abs(sx - x) <= 7 and abs(sy - y) <= 9:
+                self.focus_location(location)
+                return True
         from .emergency_rendering import visible_risks
         for sx, sy, point in visible_risks(self.sim.app.camera, self.current_report, self.kind):
             if (sx - x) ** 2 + (sy - y) ** 2 <= 64:
                 self.focus(point)
                 return True
         return False
+
+    def focus_location(self, location):
+        app = self.sim.app
+        app.clear_selection()
+        record = self.sim.datasets[location.kind][location.index]
+        app.detail_title.configure(text=location.name)
+        longitude, latitude = record['coordinate']
+        app.detail_text(f'{location.facility_type}\nOriginal longitude / latitude: {longitude:.6f}, {latitude:.6f}\n'
+                        f'Ward: {record.get("Ward") or "Unavailable"}\nZone: {record.get("Zone") or "Unavailable"}\n'
+                        f'Source: {record.get("source_file") or location.provenance}')
+        anchor = next((a for a in self.current_report.anchors if (a.kind, a.index) == (location.kind, location.index)), None)
+        if anchor:
+            entrance_lon, entrance_lat = unproject(*anchor.entrance_point)
+            app.detail_text(f'Nearest-road entrance: {entrance_lon:.6f}, {entrance_lat:.6f}\n'
+                            f'Road snap: {anchor.distance_m:.0f}m\nConnected road: {anchor.edge_id}\n'
+                            'Marker is shown at the inferred entrance; original location retained.', True)
+        else:
+            app.detail_text('No usable mapped road geometry for this facility.', True)
+        app.detail_text('Coordinates are supplied in KML. Care availability, emergency capability and ambulance dispatch are unverified.', True)
+
 
     def close(self):
         self.cancel.set()

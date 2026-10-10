@@ -17,6 +17,8 @@ class NearbyFacility:
     distance_m: float
     road_ids: tuple
     near_closed: bool
+    facility_type: str = ''
+    facility_category: str = ''
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +66,9 @@ def nearby_facilities(view, facilities, closed, loaded, radius_m=250):
                 name = facility.get('Name') if kind == 'hospitals' else facility.get('FIRE_STAName')
                 items.append(NearbyFacility(kind, index, name or 'Unnamed facility', matches[0][0],
                                              tuple(identifier for _, identifier in matches),
-                                             any(identifier in closed for _, identifier in matches)))
+                                             any(identifier in closed for _, identifier in matches),
+                                             str(facility.get('Type') or ('Hospital' if kind == 'hospitals' else 'Fire station')),
+                                             str(facility.get('facility_category') or '')))
     return tuple(sorted(items, key=lambda f: (not f.near_closed, f.distance_m, f.kind, f.index)))
 
 

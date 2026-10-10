@@ -1,6 +1,8 @@
 """Road-network accessibility estimates, not dispatch or service guarantees.
 
-Facilities attach to the nearest road within 250m. Their projection seeds both
+Facilities attach to the nearest mapped road, without a distance cutoff.
+Original coordinates are retained; the projected point is an inferred entrance.
+Their projection seeds both
 endpoints with fractional edge travel time. Multi-source Dijkstra then finds
 the fastest mapped facility for every graph node. Baseline uses the same hour
 without closures; closures and diverted traffic use the scenario's link speeds.
@@ -8,13 +10,13 @@ Off-road connectors, dispatch, availability and legal turn restrictions are
 unknown and deliberately excluded from these road-only travel estimates.
 """
 from concurrent.futures import CancelledError
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import heapq
 import math
 
 
 SERVICES = ('fire', 'hospitals')
-SERVICE_NAMES = {'fire': 'Fire station', 'hospitals': 'Hospital access'}
+SERVICE_NAMES = {'fire': 'Fire station', 'hospitals': 'Healthcare access'}
 COLORS = {'lost': '#ff6474', 'delayed': '#ff9959', 'degraded': '#f5d26d',
           'gap': '#ba95f4', 'normal': '#65d994'}
 STATUS_NAMES = {'lost': 'Lost mapped access', 'delayed': 'Slow access',
@@ -27,6 +29,26 @@ def check_cancel(cancel):
 
 
 @dataclass(frozen=True, slots=True)
+class FacilityLocation:
+    kind: str
+    index: int
+    name: str
+    point: tuple
+    facility_type: str
+    category: str
+    provenance: str
+    entrance_point: tuple | None = None
+
+    @property
+    def map_point(self):
+        return self.entrance_point if self.entrance_point is not None else self.point
+
+    @property
+    def marker(self):
+        return 'F' if self.kind == 'fire' else {'uphc': 'P', 'clinics': 'C'}.get(self.category, 'H')
+
+
+@dataclass(frozen=True, slots=True)
 class FacilityAnchor:
     kind: str
     index: int
@@ -35,7 +57,14 @@ class FacilityAnchor:
     fraction: float
     distance_m: float
     point: tuple
+    entrance_point: tuple
     provenance: str
+    facility_type: str = 'Hospital'
+    category: str = ''
+
+    @property
+    def marker(self):
+        return 'F' if self.kind == 'fire' else {'uphc': 'P', 'clinics': 'C'}.get(self.category, 'H')
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +118,7 @@ class EmergencyReport:
     threshold_s: float
     added_threshold_s: float
     paths: dict
+    locations: tuple[FacilityLocation, ...]
 
     def risks(self, kind=None):
         return tuple(sorted((p for p in self.points if p.status != 'normal' and
@@ -109,10 +139,10 @@ class EmergencyReport:
 
 
 def road_projection(point, road):
-    """Squared snap distance and fraction along a source-to-target polyline."""
+    """Squared distance, geometry fraction and closest point on the polyline."""
     segments = [(a, b, math.dist(a, b)) for path in road.paths for a, b in zip(path, path[1:])]
     length = sum(s[2] for s in segments)
-    best, fraction, travelled = math.inf, 0., 0.
+    best, fraction, travelled, entrance = math.inf, 0., 0., None
     for a, b, segment_length in segments:
         dx, dy = b[0] - a[0], b[1] - a[1]
         t = max(0., min(1., ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) /
@@ -121,47 +151,72 @@ def road_projection(point, road):
         if distance < best:
             best = distance
             fraction = (travelled + t * segment_length) / length if length else 0.
+            entrance = a[0] + t * dx, a[1] + t * dy
         travelled += segment_length
-    return best, fraction
+    return best, fraction, entrance
+
+
+def nearest_road(point, roads, cancel=None):
+    """Exact polyline search, pruning roads by their bounding-box lower bound.
+
+    Sorting cheap bounds avoids projecting onto every segment in the city.
+    Unlike nearest-node matching, this also finds entrances halfway along roads.
+    """
+    def lower_bound(road):
+        left, top, right, bottom = road.bounds
+        dx = max(left - point[0], 0., point[0] - right)
+        dy = max(top - point[1], 0., point[1] - bottom)
+        return dx * dx + dy * dy
+
+    best, closest = math.inf, None
+    candidates = sorted((lower_bound(road), index) for index, road in enumerate(roads))
+    for bound, index in candidates:
+        check_cancel(cancel)
+        if bound > best:
+            break
+        distance, fraction, entrance = road_projection(point, roads[index])
+        if distance < best:
+            best, closest = distance, (distance, fraction, entrance, roads[index])
+    return closest
 
 
 class EmergencyAccessModel:
-    def __init__(self, model, datasets, snap_radius_m=250., cancel=None):
+    def __init__(self, model, datasets, snap_radius_m=None, cancel=None):
+        if snap_radius_m is not None and (not math.isfinite(snap_radius_m) or snap_radius_m <= 0):
+            raise ValueError('Optional snap radius must be positive and finite')
         self.model = model
         self.nodes = tuple(datasets['graph']['nodes'])
         nodes_by_id = {n['id']: n for n in self.nodes}
         view = datasets['views']['KML road graph']
-        self.anchors, self.skipped = [], []
+        roads = tuple(road for road in view['roads'] if road.id in model.by_id and
+                      any(len(path) >= 2 for path in road.paths))
+        self.anchors, self.skipped, self.locations = [], [], []
         for kind in SERVICES:
             for index, facility in enumerate(datasets[kind]):
                 check_cancel(cancel)
                 name = str(facility.get('FIRE_STAName') or facility.get('Name') or 'Unnamed facility')
                 point = tuple(facility['point'])
+                location = FacilityLocation(kind, index, name, point,
+                    str(facility.get('Type') or ('Fire station' if kind == 'fire' else 'Hospital')),
+                    str(facility.get('facility_category') or ''),
+                    str(facility.get('coordinate_source') or facility.get('match_status') or 'Supplied dataset'))
+                self.locations.append(location)
                 metres = 2 * math.pi * 6371008.8 * math.cos(math.radians(facility['coordinate'][1]))
-                radius = snap_radius_m / metres
-                candidates = view['index'].query((point[0] - radius, point[1] - radius,
-                                                  point[0] + radius, point[1] + radius))
-                closest = None
-                for road_index in sorted(candidates):
-                    road = view['roads'][road_index]
-                    if road.id not in model.by_id:
-                        continue
-                    distance, fraction = road_projection(point, road)
-                    if closest is None or distance < closest[0]:
-                        closest = distance, fraction, road
-                if closest is None or math.sqrt(closest[0]) * metres > snap_radius_m:
+                closest = nearest_road(point, roads, cancel)
+                if closest is None or (snap_radius_m is not None and math.sqrt(closest[0]) * metres > snap_radius_m):
                     self.skipped.append((kind, name))
                     continue
-                distance, fraction, road = closest
+                distance, fraction, entrance, road = closest
+                self.locations[-1] = replace(location, entrance_point=entrance)
                 # Dataset geometries normally run source -> target. Verify this
                 # using actual node coordinates rather than trusting file order.
                 source = nodes_by_id.get(road.properties['source'])
                 if source and math.dist(road.paths[0][0], source['point']) > math.dist(road.paths[-1][-1], source['point']):
                     fraction = 1 - fraction
                 self.anchors.append(FacilityAnchor(kind, index, name, road.id, fraction,
-                    math.sqrt(distance) * metres, point,
-                    str(facility.get('match_status') or facility.get('coordinate_source') or 'Supplied dataset')))
-        self.anchors, self.skipped = tuple(self.anchors), tuple(self.skipped)
+                    math.sqrt(distance) * metres, point, entrance,
+                    location.provenance, location.facility_type, location.category))
+        self.anchors, self.skipped, self.locations = tuple(self.anchors), tuple(self.skipped), tuple(self.locations)
         self.baseline_cache = None
 
     def access(self, result, kind, cancel=None):
@@ -229,4 +284,4 @@ class EmergencyAccessModel:
                 old_anchor = self.anchors[before_facilities[identifier]] if identifier in before_facilities else None
                 points.append(AccessPoint(identifier, node['number'], tuple(node['point']), kind,
                                           seconds, baseline_seconds, anchor, old_anchor, status))
-        return EmergencyReport(scenario.hour, tuple(points), self.anchors, self.skipped, threshold_s, added_threshold_s, paths)
+        return EmergencyReport(scenario.hour, tuple(points), self.anchors, self.skipped, threshold_s, added_threshold_s, paths, self.locations)

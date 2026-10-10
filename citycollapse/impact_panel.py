@@ -113,7 +113,7 @@ class ImpactPanel(ctk.CTkFrame):
                 text = f'BLOCKED / baseline {state.baseline:,.0f} veh/h' if state.closed else f'{state.baseline:,.0f} -> {state.flow:,.0f} veh/h / +{state.flow - state.baseline:,.1f}\nTravel time +{(state.delay_ratio - 1) * 100:.1f}%'
             elif self.tab == 'Facilities':
                 title, command = item.name[:38], lambda facility=item: self.on_facility(facility)
-                text = f'{"Hospital" if item.kind == "hospitals" else "Fire station"} / {item.distance_m:.0f}m from affected road\nNear {"closure" if item.near_closed else "diverted traffic"} / {len(item.road_ids)} affected roads'
+                text = f'{item.facility_type or item.kind} / {item.distance_m:.0f}m from affected road\nNear {"closure" if item.near_closed else "diverted traffic"} / {len(item.road_ids)} affected roads'
             elif isinstance(item, tuple):
                 title, command = item[0], lambda key=item[0]: self.on_road(key)
                 text = item[1]
