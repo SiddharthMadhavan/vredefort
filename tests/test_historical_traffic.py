@@ -32,6 +32,20 @@ class HistoricalTests(unittest.TestCase):
         return HistoricalTrafficAnalyst(self.config, self.dataset).collect_evidence(
             self.network, 'e0', AnalysisCancel(), lambda *args: None, self.live)
 
+    def test_bundled_history_reuses_index_across_extraction_directories(self):
+        from citycollapse import historical_traffic
+        cancel = AnalysisCancel()
+        with patch('sys.frozen', True, create=True), patch.object(historical_traffic, 'DEFAULT_HISTORY', self.path):
+            original = self.dataset.index(cancel, lambda *args: None)
+        extracted = self.folder / 'new-extraction' / self.path.name
+        extracted.parent.mkdir()
+        extracted.write_bytes(self.path.read_bytes())
+        next_launch = HistoricalDataset(extracted, self.folder / 'cache')
+        with patch('sys.frozen', True, create=True), patch.object(historical_traffic, 'DEFAULT_HISTORY', extracted):
+            self.assertEqual(next_launch.index(cancel, lambda *args: None), original)
+            extracted.write_bytes(extracted.read_bytes() + b'\n')
+            self.assertNotEqual(next_launch.index(cancel, lambda *args: None), original)
+
     def test_exact_edge_stats_time_zone_and_synthetic_comparison(self):
         evidence = self.evidence()
         self.assertTrue(evidence['synthetic'])

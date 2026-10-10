@@ -9,10 +9,12 @@ import json
 import math
 from pathlib import Path
 import sqlite3
+import sys
 from statistics import mean, median
 from uuid import uuid4
 
 from .data import ROOT, DATA
+from .paths import CACHE_DIR
 from .live_traffic import LiveTrafficAnalyst, check_cancel, road_context, utc_now
 
 IST = timezone(timedelta(hours=5, minutes=30), 'IST')
@@ -55,7 +57,7 @@ class HistoricalDataset:
     """Build a disposable local SQLite index, without loading the CSV into RAM."""
     def __init__(self, source=DEFAULT_HISTORY, cache_dir=None):
         self.source = Path(source)
-        self.cache_dir = Path(cache_dir) if cache_dir else ROOT / '.cache' / 'history'
+        self.cache_dir = Path(cache_dir) if cache_dir else CACHE_DIR / 'history'
 
     def index(self, cancel, emit):
         check_cancel(cancel)
@@ -63,6 +65,11 @@ class HistoricalDataset:
             raise ValueError('Synthetic history dataset not found. Check CITYCOLLAPSE_HISTORY_CSV.')
         stat = self.source.stat()
         signature = f'v2|{self.source.resolve()}|{stat.st_size}|{stat.st_mtime_ns}'
+        if getattr(sys, 'frozen', False) and self.source.resolve() == DEFAULT_HISTORY.resolve():
+            # One-file bundles extract into a different directory each launch.
+            # Identify the bundled dataset by content so its index is reusable.
+            with self.source.open('rb') as source:
+                signature = 'v2|bundled|' + hashlib.file_digest(source, 'sha256').hexdigest()
         key = hashlib.sha256(signature.encode()).hexdigest()[:20]
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         target = self.cache_dir / f'{key}.sqlite3'

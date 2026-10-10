@@ -3,34 +3,43 @@ import os
 import json
 from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 from .data import ROOT
+from .paths import CACHE_DIR, ENV_ROOT
+from .user_settings import read_user_settings
 
 def environment_values():
     values = {}
     for name in ('.env', '.env.local'):
-        path = ROOT / name
+        path = ENV_ROOT / name
         if path.exists():
             for line in path.read_text(encoding='utf-8-sig').splitlines():
                 if '=' in line and not line.lstrip().startswith('#'):
                     key, value = line.split('=', 1)
                     values[key.strip()] = value.strip().strip('"\'')
     values.update(os.environ)
+    user = read_user_settings()
+    values.update(user)
+    if 'TOMTOM_API_KEY' in user:
+        values['CITYCOLLAPSE_TOMTOM_API_KEY'] = user['TOMTOM_API_KEY']
     return values
 
 
-MAP_PREFERENCES = ROOT / '.cache/map-preferences.json'
+MAP_PREFERENCES = CACHE_DIR / 'map-preferences.json'
 DEFAULT_TILE_URL = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
 
 
-def settings():
-    values = environment_values()
+def settings(values=None):
+    values = environment_values() if values is None else values
     template = values.get('CITYCOLLAPSE_TILE_URL') or values.get('VITE_MAP_TILE_URL') or DEFAULT_TILE_URL
     parsed = urlsplit(template)
     if parsed.scheme not in ('http', 'https') or not all('{' + token + '}' in template for token in ('x', 'y', 'z')):
         raise ValueError('CITYCOLLAPSE_TILE_URL must be an HTTP raster URL with {z}, {x}, {y}')
     key = values.get('VITE_CARTO_API_KEY', '')
-    if key and (parsed.hostname == 'basemaps.cartocdn.com' or (parsed.hostname or '').endswith('.basemaps.cartocdn.com')):
+    if 'VITE_CARTO_API_KEY' in values and (parsed.hostname == 'basemaps.cartocdn.com' or (parsed.hostname or '').endswith('.basemaps.cartocdn.com')):
         query = dict(parse_qsl(parsed.query))
-        query.setdefault('key', key)
+        if key:
+            query['key'] = key
+        else:
+            query.pop('key', None)
         template = urlunsplit(parsed._replace(query=urlencode(query)))
     try:
         preferences = json.loads(MAP_PREFERENCES.read_text(encoding='utf-8'))
@@ -53,8 +62,8 @@ def save_map_preferences(offline, local_path):
     temporary.replace(MAP_PREFERENCES)
 
 
-def analyst_settings():
-    values = environment_values()
+def analyst_settings(values=None):
+    values = environment_values() if values is None else values
     base_url = values.get('OLLAMA_BASE_URL', 'http://127.0.0.1:11434').rstrip('/')
     parsed = urlsplit(base_url)
     if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.query or parsed.fragment or parsed.username:

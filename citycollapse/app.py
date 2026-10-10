@@ -12,7 +12,9 @@ from threading import Thread
 import customtkinter as ctk
 from PIL import ImageTk
 
-from .config import settings, analyst_settings, save_map_preferences, DEFAULT_TILE_URL
+from .config import (settings, analyst_settings, save_map_preferences, DEFAULT_TILE_URL,
+                     environment_values)
+from .user_settings import save_user_settings
 from .geometry import project
 from .map_renderer import Camera, FONT_FILE, TileCache
 from .explore_map import load_network, nearest_node, nearest_road, ExplorePainter
@@ -64,6 +66,7 @@ class CityCollapseApp(ctk.CTk):
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='map-paint')
         self.map_painter = ExplorePainter()
         self.map_options = None
+        self.settings_panel = None
         self.data_future = self.worker.submit(load_network)
         self.tiles = None
         try:
@@ -117,9 +120,14 @@ class CityCollapseApp(ctk.CTk):
             self.map_area, width=300, fg_color=BG, border_width=1,
             border_color=BORDER, corner_radius=4)
         self.details.place(x=16, y=16)
-        ctk.CTkLabel(self.details, text='CITYCOLLAPSE_', text_color=FG,
+        heading = ctk.CTkFrame(self.details, fg_color='transparent')
+        heading.pack(fill='x', padx=16, pady=(12, 0))
+        ctk.CTkLabel(heading, text='CITYCOLLAPSE_', text_color=FG,
                      font=ctk.CTkFont(self.font_name, 28)).pack(
-                         anchor='w', padx=16, pady=(12, 0))
+                         side='left')
+        self.settings_button = self.button(heading, 'Settings', self.show_settings,
+                                           width=64)
+        self.settings_button.pack(side='right', padx=(6, 0))
         self.subtitle = ctk.CTkLabel(self.details, text='BENGALURU / ROAD EXPLORER',
                                      font=self.small_font, text_color='#7eaf87')
         self.subtitle.pack(anchor='w', padx=16, pady=(0, 12))
@@ -662,6 +670,45 @@ class CityCollapseApp(ctk.CTk):
             from .map_options import MapOptions
             self.map_options = MapOptions(self)
         self.map_options.show()
+
+    def show_settings(self):
+        if self.settings_panel is None or not self.settings_panel.window.winfo_exists():
+            from .settings_panel import SettingsPanel
+            self.settings_panel = SettingsPanel(self)
+        self.settings_panel.show()
+
+    @staticmethod
+    def validate_connection_settings(values):
+        for key in ('TOMTOM_API_KEY', 'VITE_CARTO_API_KEY'):
+            if any(character.isspace() for character in values.get(key, '')):
+                raise ValueError('API keys cannot contain spaces or line breaks.')
+        analyst_settings(values)
+
+    def apply_connection_settings(self, values):
+        self.validate_connection_settings(values)
+        combined = environment_values()
+        combined.update(values)
+        config = settings(combined)
+        replacement = None
+        if not self.tiles or config['tile_url'] != self.tiles.url:
+            replacement = TileCache(config['tile_url'],
+                offline=self.tiles.offline if self.tiles else config['offline'],
+                local_path=self.tiles.local_path if self.tiles else config['local_path'])
+        try:
+            save_user_settings(values)
+        except Exception:
+            if replacement:
+                replacement.close()
+            raise
+        if replacement:
+            if self.tiles:
+                self.tiles.close()
+            self.tiles = replacement
+            self.config_values['tile_url'] = config['tile_url']
+            self.configuration_error = ''
+            self.invalidate()
+            if self.simulation.comparison:
+                self.simulation.comparison.painted_key = None
 
     def set_basemap(self, offline, local_path=None):
         """Replace the source atomically; failed packs leave the current map intact."""

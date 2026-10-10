@@ -15,6 +15,7 @@ import urllib.request
 from urllib.parse import urlsplit
 from PIL import Image
 from .data import ROOT
+from .paths import CACHE_DIR
 
 FONT_FILE = ROOT / 'assets/fonts/VT323-Regular.ttf'
 
@@ -87,7 +88,7 @@ class TileCache:
         self.views = {}
         self.images = OrderedDict()
         self.changed_keys, self.fallback_keys = set(), set()
-        self.folder = Path(cache_dir) if cache_dir else ROOT / '.cache/tiles' / hashlib.sha256(url.encode()).hexdigest()[:16]
+        self.folder = Path(cache_dir) if cache_dir else CACHE_DIR / 'tiles' / hashlib.sha256(url.encode()).hexdigest()[:16]
 
     def _database(self):
         # A connection per worker operation: sqlite connections are not shared

@@ -1,10 +1,9 @@
 """Local datasets and a spatial index. No network or GUI dependencies."""
 from dataclasses import dataclass
 import json
-from pathlib import Path
 from .geometry import project
+from .paths import ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data'
 
 @dataclass(frozen=True, slots=True)
