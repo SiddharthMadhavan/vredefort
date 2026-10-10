@@ -9,7 +9,7 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 
 from .comparison import comparison_metrics, format_metric
-from .explore_map import paint_explore, nearest_node, nearest_road
+from .explore_map import ExplorePainter, nearest_node, nearest_road
 from .geometry import project
 from .presentation import display_text
 from .traffic_animation import FlowLayer
@@ -39,6 +39,7 @@ class ComparisonView:
         self.painted_key = self.display_camera = self.displayed_result_key = None
         self.camera = replace(self.app.camera, width=560, height=400)
         self.painters = (TrafficPainter(), TrafficPainter())
+        self.base_painter = ExplorePainter()
         self.images = []
         self.drag_origin = None
         self.dragged = False
@@ -289,10 +290,11 @@ class ComparisonView:
         keys = self.camera.tile_keys()
         tiles = {}
         if self.app.tiles:
-            self.app.tiles.request(keys)
+            self.app.tiles.request(keys, viewer='comparison')
             tiles = self.app.tiles.snapshot(keys)
         route = sim.active_diversion.route.edge_ids if sim.active_diversion else None
-        key = (self.camera, sim.result_key, selection, sim.heatmap_enabled, route, tuple(tiles))
+        key = (self.camera, sim.result_key, selection, sim.heatmap_enabled, route,
+               tuple((key, id(tile)) for key, tile in tiles.items()))
         if self.future and self.future.done():
             future, self.future = self.future, None
             try:
@@ -317,7 +319,7 @@ class ComparisonView:
             baseline, scenario, report, diversion = sim.baseline_result, sim.result, sim.report, sim.active_diversion
             heatmap = sim.heatmap_enabled
             def paint():
-                base = paint_explore(camera, tiles, network, selection).convert('RGBA')
+                base = self.base_painter.paint(camera, tiles, network, selection).convert('RGBA')
                 frames = []
                 for index, result in enumerate((baseline, scenario)):
                     overlay, paths = self.painters[index].frame(camera, datasets['views']['KML road graph'], result,

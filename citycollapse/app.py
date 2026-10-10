@@ -12,10 +12,10 @@ from threading import Thread
 import customtkinter as ctk
 from PIL import ImageTk
 
-from .config import settings, analyst_settings
+from .config import settings, analyst_settings, save_map_preferences, DEFAULT_TILE_URL
 from .geometry import project
 from .map_renderer import Camera, FONT_FILE, TileCache
-from .explore_map import load_network, nearest_node, nearest_road, paint_explore
+from .explore_map import load_network, nearest_node, nearest_road, ExplorePainter
 from .live_traffic import AnalysisCancel, sample_road
 from .analyst_panel import AnalystPanel
 from .traffic_agents import TrafficAnalysts
@@ -62,14 +62,19 @@ class CityCollapseApp(ctk.CTk):
         self.paint_after = 0
         self.dataset_error = self.render_error = ''
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='map-paint')
+        self.map_painter = ExplorePainter()
+        self.map_options = None
         self.data_future = self.worker.submit(load_network)
         self.tiles = None
         try:
             self.config_values = settings()
-            self.tiles = TileCache(self.config_values['tile_url'])
+            self.tiles = TileCache(self.config_values['tile_url'], offline=self.config_values['offline'],
+                                   local_path=self.config_values['local_path'])
+            if self.tiles.local_path:
+                self.config_values['attribution'] = self.tiles.attribution or 'Local basemap / attribution unavailable'
             self.configuration_error = ''
         except ValueError as error:
-            self.config_values = {'attribution': '\u00a9 OpenStreetMap contributors \u00b7 \u00a9 CARTO'}
+            self.config_values = {'tile_url': DEFAULT_TILE_URL, 'attribution': '\u00a9 OpenStreetMap contributors \u00b7 \u00a9 CARTO'}
             self.configuration_error = str(error)
         self._build_widgets()
         self.bind('<Escape>', lambda event: self.clear_selection())
@@ -148,6 +153,8 @@ class CityCollapseApp(ctk.CTk):
             side='left', padx=3, pady=5)
         self.button(self.controls, 'Retry map', self.retry_tiles, width=88).pack(
             side='left', padx=3, pady=5)
+        self.map_button = self.button(self.controls, 'Map...', self.show_map_options, width=64)
+        self.map_button.pack(side='left', padx=3, pady=5)
         self.status = ctk.CTkLabel(
             self.map_area, text='Loading roads...', font=self.small_font, fg_color=BG,
             text_color='#9bbca1', corner_radius=2, wraplength=420, justify='left')
@@ -636,7 +643,10 @@ class CityCollapseApp(ctk.CTk):
         elif self.configuration_error:
             try:
                 self.config_values = settings()
-                self.tiles = TileCache(self.config_values['tile_url'])
+                self.tiles = TileCache(self.config_values['tile_url'], offline=self.config_values['offline'],
+                                       local_path=self.config_values['local_path'])
+                if self.tiles.local_path:
+                    self.config_values['attribution'] = self.tiles.attribution or 'Local basemap / attribution unavailable'
                 self.attribution.configure(text=self.config_values['attribution'])
                 self.configuration_error = ''
             except ValueError as error:
@@ -646,6 +656,30 @@ class CityCollapseApp(ctk.CTk):
             self.data_future = self.worker.submit(load_network)
         self.render_error = ''
         self.invalidate()
+
+    def show_map_options(self):
+        if self.map_options is None or not self.map_options.window.winfo_exists():
+            from .map_options import MapOptions
+            self.map_options = MapOptions(self)
+        self.map_options.show()
+
+    def set_basemap(self, offline, local_path=None):
+        """Replace the source atomically; failed packs leave the current map intact."""
+        config = settings()
+        tiles = TileCache(config['tile_url'], offline=offline, local_path=local_path)
+        if self.tiles:
+            self.tiles.close()
+        self.tiles = tiles
+        self.config_values = config
+        self.config_values.update(offline=tiles.offline, local_path=str(tiles.local_path) if tiles.local_path else None)
+        if tiles.local_path:
+            self.config_values['attribution'] = tiles.attribution or 'Local basemap / attribution unavailable'
+        self.attribution.configure(text=self.config_values['attribution'])
+        self.configuration_error = ''
+        self.invalidate()
+        if self.simulation.comparison:
+            self.simulation.comparison.painted_key = None
+        save_map_preferences(tiles.offline, tiles.local_path)
 
     def tick(self):
         if self.closed:
@@ -664,9 +698,10 @@ class CityCollapseApp(ctk.CTk):
                 self.dataset_error = f'Road data unavailable: {error}'
             self.invalidate()
         if self.tiles:
-            if self.tiles.poll():
-                self.invalidate()
             keys = self.camera.tile_keys()
+            self.tiles.poll()
+            if self.tiles.changed_keys.intersection(keys):
+                self.invalidate()
             self.tiles.request(keys)
         else:
             keys = []
@@ -689,7 +724,7 @@ class CityCollapseApp(ctk.CTk):
             network, selection = self.network, self.selection
 
             def render():
-                return generation, camera, paint_explore(camera, tiles, network, selection)
+                return generation, camera, self.map_painter.paint(camera, tiles, network, selection)
 
             self.render_future = self.worker.submit(render)
         failed = sum(key in self.tiles.failed for key in keys) if self.tiles else 0
@@ -698,12 +733,18 @@ class CityCollapseApp(ctk.CTk):
         if not message:
             if self.data_future:
                 message = 'Loading roads...'
+            elif failed and self.tiles and self.tiles.offline:
+                message = f'Offline basemap / {failed} tiles missing / zoom out or open a map pack'
             elif failed:
                 message = f'Basemap unavailable ({failed} tiles). Roads still selectable / Retry map'
             elif pending:
                 message = f'Loading basemap / {pending} tiles remaining'
             else:
-                message = f'Bengaluru / zoom {self.camera.zoom} / drag to pan'
+                if self.tiles and self.tiles.offline:
+                    low_resolution = sum(key in self.tiles.fallback_keys for key in keys)
+                    message = f'Offline basemap / zoom {self.camera.zoom}' + (' / lower-resolution tiles' if low_resolution else '')
+                else:
+                    message = f'Bengaluru / zoom {self.camera.zoom} / drag to pan'
         message = display_text(message)
         if self.status.cget('text') != message:
             self.status.configure(text=message)

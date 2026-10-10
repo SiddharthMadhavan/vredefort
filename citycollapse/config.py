@@ -1,5 +1,6 @@
 """Raster tile configuration; compatible with existing local raster env settings."""
 import os
+import json
 from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 from .data import ROOT
 
@@ -16,9 +17,13 @@ def environment_values():
     return values
 
 
+MAP_PREFERENCES = ROOT / '.cache/map-preferences.json'
+DEFAULT_TILE_URL = 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+
+
 def settings():
     values = environment_values()
-    template = values.get('CITYCOLLAPSE_TILE_URL') or values.get('VITE_MAP_TILE_URL') or 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+    template = values.get('CITYCOLLAPSE_TILE_URL') or values.get('VITE_MAP_TILE_URL') or DEFAULT_TILE_URL
     parsed = urlsplit(template)
     if parsed.scheme not in ('http', 'https') or not all('{' + token + '}' in template for token in ('x', 'y', 'z')):
         raise ValueError('CITYCOLLAPSE_TILE_URL must be an HTTP raster URL with {z}, {x}, {y}')
@@ -27,7 +32,25 @@ def settings():
         query = dict(parse_qsl(parsed.query))
         query.setdefault('key', key)
         template = urlunsplit(parsed._replace(query=urlencode(query)))
-    return {'tile_url': template, 'attribution': values.get('CITYCOLLAPSE_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO'}
+    try:
+        preferences = json.loads(MAP_PREFERENCES.read_text(encoding='utf-8'))
+        if not isinstance(preferences, dict):
+            preferences = {}
+    except (OSError, ValueError):
+        preferences = {}
+    offline = values.get('CITYCOLLAPSE_MAP_OFFLINE', str(preferences.get('offline', False))).lower() in ('true', '1', 'yes')
+    local_path = values.get('CITYCOLLAPSE_MAP_PATH', preferences.get('local_path')) or None
+    if local_path is not None and not isinstance(local_path, str):
+        raise ValueError('CITYCOLLAPSE_MAP_PATH must be a local raster map path')
+    return {'tile_url': template, 'offline': offline, 'local_path': local_path,
+            'attribution': values.get('CITYCOLLAPSE_MAP_ATTRIBUTION') or '© OpenStreetMap contributors · © CARTO'}
+
+
+def save_map_preferences(offline, local_path):
+    MAP_PREFERENCES.parent.mkdir(parents=True, exist_ok=True)
+    temporary = MAP_PREFERENCES.with_suffix('.tmp')
+    temporary.write_text(json.dumps({'offline': bool(offline), 'local_path': str(local_path) if local_path else None}), encoding='utf-8')
+    temporary.replace(MAP_PREFERENCES)
 
 
 def analyst_settings():

@@ -55,14 +55,14 @@ def nearest_road(network, camera, x, y):
     nearest, distance = None, radius ** 2
     for index in sorted(network.road_index.query(box)):
         road = network.roads[index]
-        squared = min(line_distance_squared(x, y, [camera.screen(p) for p in path])
+        squared = min(line_distance_squared(x, y, camera.screen_path(path))
                       for path in road.paths)
         if squared <= distance:
             nearest, distance = road, squared
     return nearest
 
 
-def paint_explore(camera, tiles, network, selection):
+def _paint_base(camera, tiles, network):
     image = Image.new('RGB', (camera.width, camera.height), '#0b100d')
     draw = ImageDraw.Draw(image)
     for z, x, y in camera.tile_keys():
@@ -77,19 +77,47 @@ def paint_explore(camera, tiles, network, selection):
 
     width = max(1, min(4, round(1 + (camera.zoom - 11) * .4)))
 
-    def road_line(road, color, thickness):
-        for path in road.paths:
-            draw.line([camera.screen(point) for point in path],
-                      fill=color, width=thickness, joint='curve')
-
     for index in sorted(network.road_index.query(camera.bounds)):
-        road_line(network.roads[index], '#71877a', width)
+        for path in network.roads[index].paths:
+            draw.line(camera.screen_path(path), fill='#71877a', width=width, joint='curve')
 
     if camera.zoom >= 13:
         for index in sorted(network.node_index.query(camera.bounds)):
             x, y = camera.screen(network.nodes[index]['point'])
             draw.ellipse((x - 2, y - 2, x + 2, y + 2),
                          fill='#a1bfaa', outline='#18291d')
+    return image
+
+
+class ExplorePainter:
+    """Reuse the background bitmap while selections and traffic change.
+
+    Owned by one paint worker. The retained image is never modified by callers.
+    Tile object identities invalidate it when actual visible tiles are replaced.
+    """
+    def __init__(self):
+        self.key = self.base = None
+        self.tiles, self.network = {}, None
+
+    def paint(self, camera, tiles, network, selection):
+        key = camera, id(network), tuple(sorted((key, id(tile)) for key, tile in tiles.items()))
+        if key != self.key:
+            self.base = _paint_base(camera, tiles, network)
+            self.key = key
+            self.tiles, self.network = dict(tiles), network
+        image = self.base.copy()
+        if network is not None and selection:
+            _paint_selection(image, camera, network, selection)
+        return image
+
+
+def _paint_selection(image, camera, network, selection):
+    draw = ImageDraw.Draw(image)
+    width = max(1, min(4, round(1 + (camera.zoom - 11) * .4)))
+
+    def road_line(road, color, thickness):
+        for path in road.paths:
+            draw.line(camera.screen_path(path), fill=color, width=thickness, joint='curve')
 
     if selection:
         kind, identifier = selection
@@ -115,4 +143,8 @@ def paint_explore(camera, tiles, network, selection):
             x, y = camera.screen(node['point'])
             draw.ellipse((x - 5, y - 5, x + 5, y + 5),
                          fill='#8ae8a9', outline='#e0ffe9', width=2)
-    return image
+
+
+def paint_explore(camera, tiles, network, selection):
+    """One-shot renderer; long-lived windows use their own ExplorePainter."""
+    return ExplorePainter().paint(camera, tiles, network, selection)

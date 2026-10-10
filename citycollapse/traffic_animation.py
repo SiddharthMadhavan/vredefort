@@ -124,6 +124,7 @@ class FlowLayer:
         self.origins = {}
         self.blocked = frozenset()
         self.enabled, self.dirty = False, True
+        self.drawn_elapsed = None
 
     def _show(self, item, visible):
         if self.visibility.get(item) != visible:
@@ -131,13 +132,18 @@ class FlowLayer:
             self.visibility[item] = visible
 
     def hide(self):
+        if not self.enabled and not self.dirty:
+            return
         for item in self.items:
             self._show(item, False)
         self.enabled = False
+        self.dirty = False
 
     def set_blocked(self, identifiers):
-        self.blocked = frozenset(identifiers)
-        self.dirty = True
+        blocked = frozenset(identifiers)
+        if blocked != self.blocked:
+            self.blocked = blocked
+            self.dirty = True
 
     def install(self, camera, paths, elapsed=0.0):
         from .traffic_rendering import traffic_color
@@ -183,6 +189,8 @@ class FlowLayer:
         if not enabled or camera != self.camera:
             self.hide()
             return
+        if self.enabled and not self.dirty and elapsed == self.drawn_elapsed:
+            return
         self.enabled = True
         for i, (path, offset, direction) in enumerate(self.trails):
             key = (path.identifier, path.points[0], path.points[-1], path.length)
@@ -196,3 +204,4 @@ class FlowLayer:
                     if visible:
                         self.canvas.coords(item, *segments[piece])
         self.dirty = False
+        self.drawn_elapsed = elapsed

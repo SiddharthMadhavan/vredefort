@@ -176,8 +176,11 @@ class SimulationController:
             self.flow.set_blocked(closed)
             if self.impact_window:
                 self.impact_window.withdraw()
-        self.time_label.configure(text=self.model.dataset.hours[hour][:16] + ' / IST assumed')
-        self.slider.set(hour)
+        text = self.model.dataset.hours[hour][:16] + ' / IST assumed'
+        if self.time_label.cget('text') != text:
+            self.time_label.configure(text=text)
+        if self.slider.get() != hour:
+            self.slider.set(hour)
 
     def solve(self, key, cancel):
         baseline = self.model.solve(key[0], cancel_event=cancel)
@@ -293,7 +296,9 @@ class SimulationController:
             self.display(self.fade_to if progress == 1 else Image.blend(self.fade_from, self.fade_to, eased))
             if progress == 1:
                 self.fade_from = self.fade_to = None
-        self.app.canvas.itemconfigure(self.item, state='normal' if self.bitmap_camera == self.app.camera else 'hidden')
+        state = 'normal' if self.bitmap_camera == self.app.camera else 'hidden'
+        if self.app.canvas.itemcget(self.item, 'state') != state:
+            self.app.canvas.itemconfigure(self.item, state=state)
         self.flow.draw(self.app.camera, self.elapsed)
 
     def show_impacts(self):

@@ -1,9 +1,11 @@
 """Checks for the road explorer's geometry, selection and dataset integrity."""
 import unittest
+from unittest.mock import patch
+from PIL import Image
 
 from citycollapse.data import Road, SpatialIndex
 from citycollapse.explore_map import (
-    RoadNetwork, load_network, nearest_node, nearest_road, paint_explore,
+    RoadNetwork, load_network, nearest_node, nearest_road, paint_explore, ExplorePainter,
 )
 from citycollapse.geometry import project, unproject
 from citycollapse.map_renderer import Camera
@@ -63,6 +65,24 @@ class ExplorerTests(unittest.TestCase):
         selected = paint_explore(self.camera, {}, self.network, ('node', 'n1'))
         self.assertNotEqual(normal.getpixel((80, 100)), selected.getpixel((80, 100)))
         self.assertEqual(normal.getpixel((200, 150)), selected.getpixel((200, 150)))
+
+    def test_selection_reuses_base_and_tile_replacement_invalidates_it(self):
+        from citycollapse import explore_map
+        painter = ExplorePainter()
+        with patch.object(explore_map, '_paint_base', wraps=explore_map._paint_base) as render:
+            normal = painter.paint(self.camera, {}, self.network, None)
+            selected = painter.paint(self.camera, {}, self.network, ('road', 'a'))
+            cleared = painter.paint(self.camera, {}, self.network, None)
+            self.assertEqual(render.call_count, 1)
+            self.assertEqual(normal.tobytes(), cleared.tobytes())
+            self.assertNotEqual(normal.tobytes(), selected.tobytes())
+            # Callers may modify returned images without corrupting the cache.
+            cleared.paste((255, 0, 0), (0, 0, 256, 256))
+            self.assertEqual(normal.tobytes(), painter.paint(self.camera, {}, self.network, None).tobytes())
+            key = self.camera.tile_keys()[0]
+            painter.paint(self.camera, {key: Image.new('RGB', (256, 256), 'green')}, self.network, None)
+            painter.paint(self.camera, {key: Image.new('RGB', (256, 256), 'blue')}, self.network, None)
+            self.assertEqual(render.call_count, 3)
 
     def test_real_graph_connections_reference_existing_edges_and_nodes(self):
         network = load_network()

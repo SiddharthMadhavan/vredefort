@@ -1,6 +1,7 @@
 import math
 import unittest
 from dataclasses import replace
+from unittest.mock import patch
 from citycollapse.traffic_animation import (FlowPath, clip_segment, visible_paths,
                                             point_at, trail_segments, path_slice, FlowLayer)
 
@@ -68,6 +69,23 @@ class TrafficAnimationTests(unittest.TestCase):
         layer.set_blocked({'road'})
         layer.draw(camera, 12.4)
         self.assertTrue(all(value['state'] == 'hidden' for value in canvas.items.values()))
+
+    def test_paused_frames_skip_tk_updates_and_resume_after_hiding(self):
+        canvas, camera = RecordingCanvas(), object()
+        layer = FlowLayer(canvas)
+        layer.install(camera, [self.path])
+        layer.draw(camera, 5)
+        with patch.object(canvas, 'coords', wraps=canvas.coords) as coords:
+            for _ in range(60):
+                layer.draw(camera, 5)
+            coords.assert_not_called()
+            layer.hide()
+            layer.draw(camera, 5)
+            self.assertTrue(coords.called)
+            self.assertTrue(any(value['state'] == 'normal' for value in canvas.items.values()))
+            coords.reset_mock()
+            layer.draw(camera, 5.033)
+            self.assertTrue(coords.called)
 
 
 if __name__ == '__main__':

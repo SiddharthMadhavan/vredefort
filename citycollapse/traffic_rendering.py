@@ -15,7 +15,7 @@ def traffic_paths(camera, view):
     for index in sorted(view['index'].query(camera.bounds)):
         road = view['roads'][index]
         for path in road.paths:
-            screen = [camera.screen(point) for point in path]
+            screen = camera.screen_path(path)
             points = [screen[0]]
             for point in screen[1:-1]:
                 if abs(point[0] - points[-1][0]) + abs(point[1] - points[-1][1]) >= 1.5:
