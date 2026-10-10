@@ -22,6 +22,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
     app = CityCollapseApp()
     started = time.monotonic()
     stage, failures = 'startup', []
+    baseline_result = baseline_bitmap = baseline_key = None
     road_id = 'kml_merged_e_8287_0_22'
 
     def factory(config):
@@ -33,7 +34,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
     app.agent_factory = factory
 
     def check():
-        global stage
+        global stage, baseline_result, baseline_bitmap, baseline_key
         try:
             assert time.monotonic() - started < 65, f'Timed out at {stage}'
             sim = app.simulation
@@ -43,6 +44,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                 return
             if stage == 'startup':
                 assert sim.model is None
+                assert not sim.heatmap_enabled and sim.heatmap_button.cget('text') == 'Heatmap: OFF'
                 app.set_mode('Traffic simulation')
                 stage = 'loaded'
             elif stage == 'loaded':
@@ -50,6 +52,28 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                     app.after(50, check)
                     return
                 assert len(sim.result.links) == 4448
+                baseline_result, baseline_bitmap, baseline_key = sim.result, sim.bitmap.tobytes(), sim.requested_key
+                sim.heatmap_button.invoke()
+                assert sim.heatmap_enabled and sim.heatmap_button.cget('text') == 'Heatmap: ON'
+                stage = 'heatmap_on'
+            elif stage == 'heatmap_on':
+                if sim.painted_key != sim.paint_key() or sim.fade_to is not None:
+                    app.after(50, check)
+                    return
+                assert sim.bitmap.tobytes() != baseline_bitmap, 'Heatmap did not change the display'
+                assert sim.result is baseline_result and sim.requested_key == baseline_key
+                assert sim.clock_s == 0 and app.selection is None
+                # Rapid clicks must leave the last requested view visible.
+                for _ in range(3):
+                    sim.heatmap_button.invoke()
+                stage = 'heatmap_off'
+            elif stage == 'heatmap_off':
+                if sim.painted_key != sim.paint_key() or sim.fade_to is not None:
+                    app.after(50, check)
+                    return
+                assert not sim.heatmap_enabled and sim.bitmap.tobytes() == baseline_bitmap
+                assert sim.result is baseline_result and sim.requested_key == baseline_key
+                sim.heatmap_button.invoke()
                 app.select_road(road_id)
                 sim.seek(8)
                 sim.toggle_block()
@@ -77,14 +101,22 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                 app.analyze_selected()
                 stage = 'agents'
             elif stage == 'agents':
-                if app.agent_busy or app.agent_thread.is_alive() or sim.bitmap_camera != app.camera:
+                if app.agent_busy or app.agent_thread.is_alive():
+                    app.after(50, check)
+                    return
+                if sim.running:
+                    assert sim.elapsed > .1 and sim.clock_s > 8 * 3600
+                    sim.toggle_play()
+                # Playback keeps changing the requested frame. Pause after
+                # verifying concurrent motion, then inspect a settled frame.
+                if sim.painted_key != sim.paint_key() or sim.fade_to is not None:
                     app.after(50, check)
                     return
                 assert all(app.analyst_panel.replies[spec.key].source for spec in AGENTS)
                 assert len([body for kind, body in requests if kind == 'POST']) == 5
-                assert sim.running and sim.elapsed > .1 and sim.clock_s > 8 * 3600
+                assert sim.elapsed > .1 and sim.clock_s > 8 * 3600
                 assert sim.result.links[road_id].closed
-                sim.toggle_play()
+                assert sim.heatmap_enabled, 'Scenario update reset the heatmap toggle'
                 app.analyst_panel.select_agent('05 Review and final recommendations')
                 stage = 'capture'
                 app.after(250, check)
@@ -111,6 +143,7 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                     f'window={app.winfo_height()}, controls={sim.frame.winfo_reqheight()}, '
                     f'body={app.detail_body.cget("height")}, scale={app._get_window_scaling()}')
                 assert sim.frame.winfo_ismapped() and sim.block_button.winfo_ismapped()
+                assert sim.heatmap_button.winfo_ismapped()
                 app.close_analyst()
                 node_id = app.network.roads_by_id[road_id].properties['source']
                 app.select_node(node_id)
@@ -144,7 +177,8 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.25) 
                 assert app.canvas.itemcget(sim.item, 'state') == 'hidden'
                 assert all(reply.source for reply in app.analyst_panel.replies.values()), 'Switching modes erased agent results'
                 print('Simulation GUI smoke passed: real replay, road/junction blocks, impacts, diversions, '
-                      'conservation, animation with all five agents, compact layout, clear, stale-scenario protection and modes.')
+                      'conservation, default-off heatmap, reversible/rapid toggles, animation with all five agents, '
+                      'compact layout, clear, stale-scenario protection and modes.')
                 app.close()
                 return
             app.after(50, check)

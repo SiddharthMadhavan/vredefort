@@ -30,29 +30,110 @@ class TrafficPainter:
     def __init__(self):
         self.camera, self.view, self.paths = None, None, ()
 
-    def paint(self, camera, view, result, selected=None, impact=None):
+    def paint(self, camera, view, result, selected=None, impact=None, heatmap=False):
         if camera != self.camera or view is not self.view:
             self.paths = traffic_paths(camera, view)
             self.camera, self.view = camera, view
-        return paint_traffic(camera, view, result, selected, self.paths, impact)
+        return paint_traffic(camera, view, result, selected, self.paths, impact, heatmap)
 
-    def frame(self, camera, view, result, selected=None, impact=None, diversion=None, datasets=None):
+    def frame(self, camera, view, result, selected=None, impact=None, diversion=None, datasets=None, heatmap=False):
         from .traffic_animation import prepare_flow_paths
-        image = self.paint(camera, view, result, selected=selected, impact=impact)
+        image = self.paint(camera, view, result, selected=selected, impact=impact, heatmap=heatmap)
         if impact and impact.closed_roads:
             paint_impacts(image, camera, view, self.paths, impact, diversion, datasets, result.blocked_nodes)
         return image, prepare_flow_paths(camera, self.paths, result)
 
 
-def paint_traffic(camera, view, result, selected=None, geometry=None, impact=None):
+def congestion_hotspots(camera, geometry, result):
+    """Group visible high-congestion road samples into bounded display circles.
+
+    The 70% threshold uses the scenario's congestion fraction. These screen
+    regions are visual highlights, not measured queue boundaries. Uniform
+    distance sampling avoids interpreting extra polyline vertices as traffic.
+    """
+    from .traffic_animation import visible_paths, FlowPath, point_at
+    samples = []
+    bounds = (-24, -24, camera.width + 24, camera.height + 24)
+    for identifier, points in geometry:
+        state = result.links[identifier]
+        if state.closed or state.flow <= 0 or state.congestion < .7:
+            continue
+        for visible in visible_paths(points, bounds):
+            distances = [0.]
+            for a, b in zip(visible, visible[1:]):
+                distances.append(distances[-1] + math.dist(a, b))
+            length = distances[-1]
+            count = max(1, math.ceil(length / 100))
+            path = FlowPath(identifier, visible, tuple(distances), 0, state.congestion)
+            for i in range(count):
+                x, y = point_at(path, length * (i + .5) / count)
+                samples.append((x, y, state.congestion, identifier))
+    samples.sort(key=lambda item: (-item[2], item[3], item[0], item[1]))
+    circles = []
+    while samples and len(circles) < 12:
+        seed = samples[0]
+        nearby, remaining = [], []
+        for sample in samples:
+            (nearby if math.dist(sample[:2], seed[:2]) <= 65 else remaining).append(sample)
+        weight = sum(item[2] for item in nearby)
+        x = sum(item[0] * item[2] for item in nearby) / weight
+        y = sum(item[1] * item[2] for item in nearby) / weight
+        radius = max(38., max(math.dist((x, y), item[:2]) for item in nearby) + 22)
+        circles.append((x, y, radius, max(item[2] for item in nearby)))
+        samples = remaining
+    return circles
+
+
+def paint_hotspot_circles(image, circles):
+    if not circles:
+        return image
+    halo, borders = Image.new('RGBA', image.size), Image.new('RGBA', image.size)
+    glow_draw, draw = ImageDraw.Draw(halo), ImageDraw.Draw(borders)
+    for x, y, radius, severity in circles:
+        color = traffic_color(severity)
+        bounds = (x - radius, y - radius, x + radius, y + radius)
+        glow_draw.ellipse(bounds, outline=(*color, 155), width=9)
+        draw.ellipse(bounds, fill=(*color, 12), outline=(*color, 205), width=2)
+    image = Image.alpha_composite(image, halo.filter(ImageFilter.GaussianBlur(5)))
+    return Image.alpha_composite(image, borders)
+
+
+def paint_heatmap(camera, geometry, result):
+    """Soften simulated road congestion into a proximity overlay, not new data.
+
+    Render at quarter resolution to keep blur work off the animation loop.
+    A road contributes along its polyline, independent of vertex density.
+    Higher congestion takes priority at overlaps; this is not a vehicle count.
+    Closed roads have no flow and contribute no heat; closure markers are
+    painted separately above this layer.
+    """
+    scale = 4
+    size = (max(1, math.ceil(camera.width / scale)), max(1, math.ceil(camera.height / scale)))
+    image = Image.new('RGBA', size)
+    draw = ImageDraw.Draw(image)
+    for identifier, points in sorted(geometry, key=lambda entry: result.links[entry[0]].congestion):
+        state = result.links[identifier]
+        if state.closed or state.flow <= 0:
+            continue
+        severity = max(0., min(1., state.congestion))
+        color = traffic_color(severity)
+        draw.line([(x / scale, y / scale) for x, y in points],
+                  fill=(*color, round(50 + severity * 100)), width=13, joint='curve')
+    image = image.filter(ImageFilter.GaussianBlur(4)).resize(
+        (camera.width, camera.height), Image.Resampling.BILINEAR)
+    return paint_hotspot_circles(image, congestion_hotspots(camera, geometry, result))
+
+
+def paint_traffic(camera, view, result, selected=None, geometry=None, impact=None, heatmap=False):
     """Transparent traffic layer; no Tk objects or mutation of model results."""
-    image = Image.new('RGBA', (camera.width, camera.height))
+    geometry = geometry if geometry is not None else traffic_paths(camera, view)
+    image = paint_heatmap(camera, geometry, result) if heatmap else Image.new('RGBA', (camera.width, camera.height))
     glow = Image.new('RGBA', image.size)
     glow_draw, draw = ImageDraw.Draw(glow), ImageDraw.Draw(image)
     paths, markers = [], []
     base = max(2, min(6, 2 + (camera.zoom - 11) * .5))
     show_impacts = impact is not None and bool(impact.closed_roads)
-    for identifier, points in geometry if geometry is not None else traffic_paths(camera, view):
+    for identifier, points in geometry:
         state = result.links[identifier]
         severity = state.congestion
         color = traffic_color(severity)

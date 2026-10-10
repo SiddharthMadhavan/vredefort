@@ -19,6 +19,7 @@ class SimulationController:
     def __init__(self, app, parent):
         self.app = app
         self.enabled = self.running = False
+        self.heatmap_enabled = False
         self.model = self.datasets = self.result = self.report = None
         self.load_future = self.solve_future = self.paint_future = None
         self.cancel = Event()
@@ -66,9 +67,11 @@ class SimulationController:
         self.block_button.grid(row=4, column=0, padx=3, pady=3, sticky='ew')
         app.button(self.frame, 'Clear blocks', self.clear_blocks, width=112).grid(
             row=4, column=1, padx=3, pady=3, sticky='ew')
-        self.impact_button = app.button(self.frame, 'Impacts + diversions', self.show_impacts,
-                                         width=230, state='disabled')
-        self.impact_button.grid(row=5, column=0, columnspan=2, padx=3, pady=3, sticky='ew')
+        self.impact_button = app.button(self.frame, 'Impacts / routes', self.show_impacts,
+                                         width=112, state='disabled')
+        self.impact_button.grid(row=5, column=0, padx=3, pady=3, sticky='ew')
+        self.heatmap_button = app.button(self.frame, 'Heatmap: OFF', self.toggle_heatmap, width=112)
+        self.heatmap_button.grid(row=5, column=1, padx=3, pady=3, sticky='ew')
         self.status = label('Loading synthetic traffic...', 6)
 
     def set_enabled(self, enabled):
@@ -112,6 +115,11 @@ class SimulationController:
 
     def set_speed(self, value):
         self.speed = float(value.rstrip('x'))
+
+    def toggle_heatmap(self):
+        self.heatmap_enabled = not self.heatmap_enabled
+        self.heatmap_button.configure(text=f'Heatmap: {"ON" if self.heatmap_enabled else "OFF"}',
+                                      fg_color='#33533c' if self.heatmap_enabled else '#15251a')
 
     def toggle_play(self):
         if self.model:
@@ -164,7 +172,7 @@ class SimulationController:
 
     def paint_key(self):
         route = self.active_diversion.route.edge_ids if self.active_diversion else None
-        return self.app.camera, self.result_key, self.app.selection, route
+        return self.app.camera, self.result_key, self.app.selection, route, self.heatmap_enabled
 
     def display(self, bitmap):
         self.bitmap = bitmap
@@ -252,11 +260,12 @@ class SimulationController:
         if not self.paint_future and key != self.painted_key and now >= self.app.paint_after:
             result, report, selected, diversion = self.result, self.report, self.app.selection, self.active_diversion
             camera = self.app.camera
+            heatmap = self.heatmap_enabled
             view = self.datasets['views']['KML road graph']
             def paint():
                 bitmap, paths = self.painter.frame(camera, view, result,
                     selected=selected[1] if selected and selected[0] == 'road' else None,
-                    impact=report, diversion=diversion, datasets=self.datasets)
+                    impact=report, diversion=diversion, datasets=self.datasets, heatmap=heatmap)
                 return key, bitmap, paths
             self.paint_future = self.paint_pool.submit(paint)
         if self.fade_to is not None and self.bitmap_camera == self.app.camera:
