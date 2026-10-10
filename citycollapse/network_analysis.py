@@ -70,14 +70,23 @@ def network_facts(network, road_id, cancel):
     context = road_context(network, road_id)
     samples = context.pop('samples')
     neighbours = adjacency(network)
-    selected = context['selected_road']
-    alternative = alternative_path(neighbours, selected['source'], selected['target'], road_id, cancel)
-    alternative['selected_edge_is_bridge_in_dataset'] = alternative['status'] == 'disconnected_in_dataset'
-    alternative['interpretation'] = 'Undirected graph connectivity only; this is not a verified drivable diversion or traffic forecast.'
+    def connection(selected):
+        alternative = alternative_path(neighbours, selected['source'], selected['target'], selected['id'], cancel)
+        alternative['selected_edge_is_bridge_in_dataset'] = alternative['status'] == 'disconnected_in_dataset'
+        alternative['interpretation'] = 'Undirected graph connectivity only; this is not a verified drivable diversion or traffic forecast.'
+        return alternative
+    if 'selected_road' in context:
+        connections = {'alternative_connection_without_selected_edge': connection(context['selected_road'])}
+    else:
+        connections = {'alternative_connections_without_each_selected_edge': [
+            {'edge_id': selected['id'], **connection(selected)} for selected in context['selected_roads']],
+            'area_topology': {'selected_graph_is_connected': True,
+                              'boundary_node_count': len(context['selected_area']['boundary_node_ids']),
+                              'interpretation': 'Each alternative removes one road independently; it does not simulate closing the whole area.'}}
     junctions = [{**node, **junction_components(neighbours, node['id'], cancel)}
                  for node in context['junctions']]
-    return {**context, 'junctions': junctions, 'alternative_connection_without_selected_edge': alternative,
-            'connected_roads': [{key: item[key] for key in ('edge_id', 'label', 'junctions')} |
+    return {**context, 'junctions': junctions, **connections,
+            'connected_roads': [{key: item[key] for key in ('edge_id', 'label', 'junctions', 'scope_role') if key in item} |
                                 {'length_m': item['road'].properties['length_m']} for item in samples],
             'graph_assumptions': 'KML graph is undirected; junctions inferred from shared coordinates; legal turns and one-way restrictions unknown.',
             'unavailable_design_data': ['lane counts', 'verified carriageway widths', 'signal phases/timings',

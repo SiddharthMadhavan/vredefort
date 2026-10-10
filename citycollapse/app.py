@@ -22,6 +22,8 @@ from .traffic_agents import TrafficAnalysts
 from .agent_catalog import AGENTS, agent_models
 from .simulation_controller import SimulationController
 from .presentation import display_text
+from .analysis_scope import (AnalysisScope, MAX_AREA_ROADS, scope_roads, scope_label,
+                             selection_roads, selection_target)
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -164,10 +166,16 @@ class CityCollapseApp(ctk.CTk):
         self.simulation.set_enabled(value == 'Traffic simulation')
         if self.selection:
             kind, identifier = self.selection
-            self.select_road(identifier) if kind == 'road' else self.select_node(identifier)
+            if kind == 'road':
+                self.select_road(identifier)
+            elif kind == 'node':
+                self.select_node(identifier)
+            else:
+                self.select_area(identifier)
         self.invalidate()
 
     def clear_body(self):
+        self.selection_notice = None
         for widget in self.detail_body.winfo_children():
             widget.destroy()
         self.detail_body._parent_canvas.yview_moveto(0)
@@ -184,7 +192,7 @@ class CityCollapseApp(ctk.CTk):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
-        self.detail_text('Select a road, then press Enter to run all five traffic agents.', True)
+        self.detail_text('Select a road or junction, then press Enter to run all five traffic agents.\nShift-click connected roads to build an area.', True)
         self.detail_text('Choose Traffic simulation for hourly playback, road/junction blocks and diversions.', True)
 
     def select_road(self, identifier):
@@ -197,6 +205,7 @@ class CityCollapseApp(ctk.CTk):
         self.selection_changed()
         self.detail_title.configure(text='ROAD / EDGE')
         self.clear_body()
+        self.button(self.detail_body, 'Build area / Shift-click', lambda: self.select_area((identifier,)), width=250).pack(padx=4, pady=4)
         self.detail_text(f'ID\n{identifier}\n\nLength\n{p["length_m"]:,.1f} m')
         if p.get('names'):
             self.detail_text('Name\n' + ', '.join(p['names']))
@@ -225,6 +234,8 @@ class CityCollapseApp(ctk.CTk):
         self.selection_changed()
         self.detail_title.configure(text=f'NODE {node["number"]}')
         self.clear_body()
+        self.button(self.detail_body, 'Analyze junction [Enter]', self.analyze_selected, width=250).pack(padx=4, pady=4)
+        self.button(self.detail_body, 'Select approach roads', lambda: self.select_area(network.edge_ids[identifier]), width=250).pack(padx=4, pady=4)
         lon, lat = node['coordinate']
         self.detail_text(
             f'ID\n{identifier}\n\nKind\n{node["kind"].replace("_", " ")}'
@@ -244,6 +255,76 @@ class CityCollapseApp(ctk.CTk):
         self.clear_button.configure(state='normal')
         self.invalidate()
 
+    def select_area(self, identifiers):
+        if self.network is None:
+            return
+        scope = AnalysisScope.area(identifiers)
+        try:
+            identifiers = scope_roads(self.network, scope)
+        except ValueError as error:
+            self.show_selection_notice(str(error))
+            return
+        self.selection = ('area', identifiers)
+        self.selection_changed()
+        self.detail_title.configure(text=f'AREA / {len(identifiers)} ROADS')
+        self.clear_body()
+        self.selection_notice = self.detail_text(f'Shift-click adjoining roads to add/remove.\nUp to {MAX_AREA_ROADS} connected roads.', True)
+        self.button(self.detail_body, 'Analyze area [Enter]', self.analyze_selected, width=250).pack(padx=4, pady=4)
+        self.button(self.detail_body, 'Fit selected area', lambda: self.focus_analyzed_road(selection_target(self.selection)), width=250).pack(padx=4, pady=4)
+        nodes = {self.network.roads_by_id[edge].properties[key] for edge in identifiers for key in ('source', 'target')}
+        length = sum(self.network.roads_by_id[edge].properties['length_m'] for edge in identifiers)
+        self.detail_text(f'{len(nodes)} nodes / {length:,.0f} m of selected roads\nSelected roads highlighted on the map.')
+        for edge in identifiers:
+            button = self.button(self.detail_body, f'Remove {edge}', lambda edge=edge: self.toggle_area_road(edge), width=250)
+            button.configure(font=ctk.CTkFont(self.font_name, 15))
+            button.pack(padx=4, pady=3)
+        adjacent = sorted({edge for node in nodes for edge in self.network.edge_ids[node]} - set(identifiers))
+        self.detail_text(f'Adjoining roads ({len(adjacent)}) / click to add', True)
+        for edge in adjacent:
+            button = self.button(self.detail_body, f'+ {edge}', lambda edge=edge: self.toggle_area_road(edge), width=250)
+            button.configure(font=ctk.CTkFont(self.font_name, 15))
+            button.pack(padx=4, pady=3)
+        self.show_area_simulation_details()
+        self.clear_button.configure(state='normal')
+        self.invalidate()
+
+    def show_selection_notice(self, message):
+        label = getattr(self, 'selection_notice', None)
+        if label and label.winfo_exists():
+            label.configure(text=display_text(message))
+        else:
+            first = self.detail_body.winfo_children()
+            self.selection_notice = self.detail_text(message, True)
+            if first:
+                self.selection_notice.pack_configure(before=first[0])
+        self.detail_body._parent_canvas.yview_moveto(0)
+
+    def toggle_area_road(self, identifier):
+        identifiers = set(selection_roads(self.network, self.selection))
+        if identifier in identifiers:
+            identifiers.remove(identifier)
+        else:
+            identifiers.add(identifier)
+        if not identifiers:
+            self.clear_selection()
+        else:
+            self.select_area(identifiers)
+
+    def show_area_simulation_details(self):
+        sim = self.simulation
+        if not sim.enabled or not sim.result or not self.selection or self.selection[0] != 'area':
+            return
+        states = [sim.result.links[identifier] for identifier in self.selection[1]]
+        open_states = [state for state in states if not state.closed]
+        text = f'SCENARIO / {sum(state.closed for state in states)} of {len(states)} roads blocked'
+        if open_states:
+            text += f'\nMean congestion on open selected roads: {sum(state.congestion for state in open_states)/len(open_states):.0%}'
+        label = getattr(self, 'traffic_detail', None)
+        if label and label.winfo_exists():
+            label.configure(text=text)
+        else:
+            self.traffic_detail = self.detail_text(text, True)
+
     def clear_selection(self):
         self.selection = None
         self.selection_changed()
@@ -256,13 +337,13 @@ class CityCollapseApp(ctk.CTk):
     def selection_changed(self):
         if hasattr(self, 'simulation'):
             self.simulation.selection_changed()
-        if self.agent_target and self.selection != ('road', self.agent_target):
+        if self.agent_target and selection_target(self.selection) != self.agent_target:
             self.agent_cancel.set()
             self.agent_generation += 1
             self.agent_busy = False
             self.agent_target = None
             for spec in AGENTS:
-                self.analyst_panel.set_status('Selection changed / select a road and press Enter', agent=spec.key)
+                self.analyst_panel.set_status('Selection changed / press Enter to analyze this scope', agent=spec.key)
             self.analyst_panel.set_pipeline_status('Cancelled / selection changed')
 
     def show_simulation_details(self, identifier):
@@ -280,13 +361,19 @@ class CityCollapseApp(ctk.CTk):
                 self.traffic_detail = self.detail_text(text, True)
 
     def analyze_selected(self, event=None):
-        if self.network is None or not self.selection or self.selection[0] != 'road':
-            self.status.configure(text='Select a road, then press Enter to analyze traffic.')
+        if self.network is None or not self.selection:
+            self.status.configure(text='Select a road, junction or connected area, then press Enter.')
             return 'break'
         if self.agent_thread and self.agent_thread.is_alive():
             self.analyst_panel.set_pipeline_status('Analysis in progress; a cancelled request may take a moment to stop.')
             return 'break'
-        road_id = self.selection[1]
+        road_id = selection_target(self.selection)
+        try:
+            scope_roads(self.network, road_id)
+        except ValueError as error:
+            self.show_selection_notice(str(error))
+            return 'break'
+        target_label = scope_label(self.network, road_id)
         self.agent_generation += 1
         generation = self.agent_generation
         self.agent_cancel = AnalysisCancel()
@@ -306,12 +393,12 @@ class CityCollapseApp(ctk.CTk):
             config = analyst_settings()
         except ValueError as error:
             self.agent_busy = False
-            self.analyst_panel.begin(road_id, 'configuration error')
+            self.analyst_panel.begin(target_label, 'configuration error')
             for spec in AGENTS:
                 self.analyst_panel.set_status(str(error), error=True, agent=spec.key)
             self.analyst_panel.set_pipeline_status('Not started / configuration error')
             return 'break'
-        self.analyst_panel.begin(road_id, config['model'], config['history_model'], models=agent_models(config))
+        self.analyst_panel.begin(target_label, config['model'], config['history_model'], models=agent_models(config))
         network, factory, events = self.network, self.agent_factory, self.agent_events
 
         def emit(kind, value):
@@ -335,16 +422,34 @@ class CityCollapseApp(ctk.CTk):
         self.agent_thread.start()
         return 'break'
 
-    def focus_analyzed_road(self):
-        if self.closed or not self.agent_target or not self.network:
+    def focus_analyzed_road(self, target=None):
+        target = self.agent_target if target is None else target
+        if self.closed or not target or not self.network:
             return
-        coordinate, _ = sample_road(self.network.roads_by_id[self.agent_target])
-        point = project(*coordinate)
         panel_right = self.details.winfo_x() + self.details.winfo_width() + 12
-        x = (min(panel_right, self.camera.width - 40) + self.camera.width) / 2
+        right = self.camera.width
+        if isinstance(target, str):
+            coordinate, _ = sample_road(self.network.roads_by_id[target])
+            point = project(*coordinate)
+        else:
+            points = [p for identifier in scope_roads(self.network, target)
+                      for path in self.network.roads_by_id[identifier].paths for p in path]
+            xs, ys = zip(*points)
+            point = ((min(xs)+max(xs))/2, (min(ys)+max(ys))/2)
+            import math
+            # Keep the entire area clear of both the details and floating controls.
+            right -= 24
+            if self.analyst_panel.place_info():
+                right -= self.controls.winfo_width()+16
+            panel_right = min(panel_right, right-80)
+            available = max(80, right-panel_right-20)
+            scale = min(available/max(max(xs)-min(xs), 1e-9), max(100, self.camera.height-160)/max(max(ys)-min(ys), 1e-9))
+            self.camera = replace(self.camera, zoom=max(8, min(18, int(math.log2(scale/256)))))
+        x = (min(panel_right, right-40) + right) / 2
         self.camera = replace(self.camera, x=point[0] - (x - self.camera.width / 2) / self.camera.scale,
                               y=point[1])
         self.invalidate()
+        self.update_zoom_buttons()
 
     def close_analyst(self):
         self.agent_cancel.set()
@@ -391,8 +496,13 @@ class CityCollapseApp(ctk.CTk):
             if chunks:
                 self.analyst_panel.append(''.join(chunks), agent=agent)
 
-    def pick(self, x, y):
+    def pick(self, x, y, extend=False):
         if self.network is None:
+            return
+        if extend:
+            road = nearest_road(self.network, self.camera, x, y)
+            if road:
+                self.toggle_area_road(road.id)
             return
         node = nearest_node(self.network, self.camera, x, y)
         if node:
@@ -515,7 +625,7 @@ class CityCollapseApp(ctk.CTk):
         if not self.drag_origin:
             return
         if not self.dragged:
-            self.pick(event.x, event.y)
+            self.pick(event.x, event.y, extend=bool(getattr(event, 'state', 0) & 1))
         self.drag_origin = None
         self.paint_after = 0
         self.invalidate()

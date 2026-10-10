@@ -50,9 +50,9 @@ with fixture_server(chat_delay=.3) as (url, requests), patch('citycollapse.live_
                 road_id = road.id
                 point = project(*sample_road(road)[0])
                 app.camera = replace(app.camera, x=point[0], y=point[1], zoom=15)
-                app.select_node(road.properties['source'])
+                app.clear_selection()
                 app.analyze_selected()
-                assert not app.analyst_panel.place_info(), 'Node Enter incorrectly analyzed a road'
+                assert not app.analyst_panel.place_info(), 'Empty selection incorrectly started analysis'
                 app.select_road(road_id)
                 app.canvas.focus_set()
                 app.canvas.event_generate('<Return>')

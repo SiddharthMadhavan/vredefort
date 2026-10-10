@@ -14,6 +14,7 @@ from .simulation_data import load_simulation_data
 from .traffic_animation import FlowLayer
 from .traffic_rendering import TrafficPainter
 from .presentation import display_text
+from .analysis_scope import selection_roads
 
 
 class SimulationController:
@@ -107,8 +108,9 @@ class SimulationController:
         ready = self.enabled and self.model is not None and target is not None
         if ready:
             kind, identifier = target
-            blocked = identifier in (self.blocked_edges if kind == 'road' else self.blocked_nodes)
-            text = f'{"Unblock" if blocked else "Block"} {"road" if kind == "road" else "junction"}'
+            blocked = set(identifier) <= self.blocked_edges if kind == 'area' else identifier in (
+                self.blocked_edges if kind == 'road' else self.blocked_nodes)
+            text = f'{"Unblock" if blocked else "Block"} {"road" if kind == "road" else "area" if kind == "area" else "junction"}'
         else:
             text = 'Select to block'
         self.block_button.configure(text=text, state='normal' if ready else 'disabled')
@@ -137,8 +139,14 @@ class SimulationController:
     def toggle_block(self):
         if self.model and self.app.selection:
             kind, identifier = self.app.selection
-            group = self.blocked_edges if kind == 'road' else self.blocked_nodes
-            group.remove(identifier) if identifier in group else group.add(identifier)
+            if kind == 'area':
+                if set(identifier) <= self.blocked_edges:
+                    self.blocked_edges.difference_update(identifier)
+                else:
+                    self.blocked_edges.update(identifier)
+            else:
+                group = self.blocked_edges if kind == 'road' else self.blocked_nodes
+                group.remove(identifier) if identifier in group else group.add(identifier)
             self.active_diversion = None
             self.failed_key = None
             self.request()
@@ -197,6 +205,8 @@ class SimulationController:
         self.app.after_idle(self.app.resize_detail_body)
         if self.app.selection and self.app.selection[0] == 'road':
             self.app.show_simulation_details(self.app.selection[1])
+        elif self.app.selection and self.app.selection[0] == 'area':
+            self.app.show_area_simulation_details()
 
     def tick(self, now):
         dt = max(0., min(.2, now - self.last_tick))
@@ -273,7 +283,7 @@ class SimulationController:
             view = self.datasets['views']['KML road graph']
             def paint():
                 bitmap, paths = self.painter.frame(camera, view, result,
-                    selected=selected[1] if selected and selected[0] == 'road' else None,
+                    selected=selection_roads(self.app.network, selected),
                     impact=report, diversion=diversion, datasets=self.datasets, heatmap=heatmap)
                 return key, bitmap, paths
             self.paint_future = self.paint_pool.submit(paint)

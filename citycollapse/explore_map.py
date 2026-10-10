@@ -99,10 +99,18 @@ def paint_explore(camera, tiles, network, selection):
             road_line(road, '#8ae8a9', width + 2)
             endpoints = (network.nodes_by_id[road.properties['source']],
                          network.nodes_by_id[road.properties['target']])
-        else:
+        elif kind == 'node':
             for edge_id in network.edge_ids[identifier]:
                 road_line(network.roads_by_id[edge_id], '#8ae8a9', width + 1)
             endpoints = (network.nodes_by_id[identifier],)
+        else:
+            node_ids = set()
+            for edge_id in identifier:
+                road = network.roads_by_id[edge_id]
+                road_line(road, '#173a28', width + 5)
+                road_line(road, '#8ae8a9', width + 2)
+                node_ids.update((road.properties['source'], road.properties['target']))
+            endpoints = tuple(network.nodes_by_id[node] for node in sorted(node_ids))
         for node in endpoints:
             x, y = camera.screen(node['point'])
             draw.ellipse((x - 5, y - 5, x + 5, y + 5),

@@ -133,6 +133,7 @@ def paint_traffic(camera, view, result, selected=None, geometry=None, impact=Non
     paths, markers = [], []
     base = max(2, min(6, 2 + (camera.zoom - 11) * .5))
     show_impacts = impact is not None and bool(impact.closed_roads)
+    selected_ids = {selected} if isinstance(selected, str) else set(selected or ())
     for identifier, points in geometry:
         state = result.links[identifier]
         severity = state.congestion
@@ -151,7 +152,7 @@ def paint_traffic(camera, view, result, selected=None, geometry=None, impact=Non
     for identifier, points, color, width in paths:
         if show_impacts and identifier in impact.loaded_roads:
             draw.line(points, fill='#dfac57', width=width + 3, joint='curve')
-        if identifier == selected:
+        if identifier in selected_ids:
             draw.line(points, fill='#d7eddc', width=width + 3, joint='curve')
         draw.line(points, fill=color, width=max(1, width), joint='curve')
     for x, y in markers:

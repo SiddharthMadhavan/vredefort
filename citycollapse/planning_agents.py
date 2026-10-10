@@ -17,6 +17,10 @@ only a sampled fragment flag. No queues, causality, signal plans, lane capacity,
 safety outcomes, costs, or improvement percentages have been measured here.
 Connectivity paths are undirected mathematical paths, not verified legal road
 diversions. Graph bridges/articulation points concern this incomplete dataset.
+When selected_area is supplied, assess the entire junction/connected area; compare
+its selected roads and boundary approaches separately. Coordinate proposals across
+shared junctions rather than treating roads independently. Coverage omissions
+remain unknown. Individual edge-removal connections do not simulate an area closure.
 Unavailable upstream reports must remain unavailable. Do not fill gaps with
 invented findings. Flag incomplete/truncated reports. Cite supplied edge IDs,
 node labels, or evidence sections beside factual claims. No Markdown tables.
@@ -25,7 +29,7 @@ node labels, or evidence sections beside factual claims. No Markdown tables.
 PROMPTS = {
     'network': GROUNDING + """
 You are the Network Bottleneck Analyst (agent 3).
-Answer: Where might this selected road/junction be vulnerable, and what supports
+Answer: Where might this selected road/junction/connected area be vulnerable, and what supports
 that assessment? Explain computed bridge/articulation/alternative-connection facts
 first. Compare valid fragment speed ratios and note coverage and shared fragments.
 Describe synthetic slow-hour patterns separately. Offer at most three bottleneck
@@ -70,7 +74,7 @@ def compact_inputs(live, historical):
     """Keep factual inputs bounded; do not send every upstream hourly profile again."""
     live_rows, fragments = [], {}
     for row in (live or {}).get('observations', []):
-        fields = ('edge_id', 'label', 'status', 'reason', 'currentSpeed', 'freeFlowSpeed',
+        fields = ('edge_id', 'label', 'scope_role', 'junctions', 'status', 'reason', 'currentSpeed', 'freeFlowSpeed',
                   'currentTravelTime', 'freeFlowTravelTime', 'delay_seconds', 'speed_ratio', 'roadClosure',
                   'confidence', 'provider_fragment_id', 'match', 'match_distance_m', 'retrieved_at_utc', 'observation_time_utc')
         live_rows.append({key: row[key] for key in fields if key in row})
@@ -80,7 +84,7 @@ def compact_inputs(live, historical):
     history_rows = []
     for row in (historical or {}).get('observations', []):
         summary = row['synthetic_history']
-        history_rows.append({'edge_id': row['edge_id'], 'label': row['label'], 'status': summary['status'],
+        history_rows.append({'edge_id': row['edge_id'], 'label': row['label'], 'scope_role': row.get('scope_role'), 'status': summary['status'],
                              'period_ist': summary.get('period_ist'), 'reason': summary.get('reason'),
                              'overall': {key: value for key, value in (summary.get('overall') or {}).items() if key in (
                                  'samples', 'distinct_dates', 'median_speed_kmh', 'speed_p10_kmh', 'speed_p90_kmh',
@@ -93,10 +97,12 @@ def compact_inputs(live, historical):
                      'requested_at_utc': (live or {}).get('requested_at_utc'), 'observations': live_rows,
                      'provider_fragment_groups': [{'fragment_id': fragment, 'edge_ids': edges} for fragment, edges in fragments.items()],
                      'unique_available_provider_fragments': len(fragments),
+                     'coverage': (live or {}).get('coverage'),
                      'freshness_note': (live or {}).get('freshness_note', 'Sensor observation age unknown.')},
             'historical': {'status': 'available' if historical else 'unavailable', 'synthetic': True,
                            'reference_time_ist': (historical or {}).get('reference_time_ist'),
                            'source': (historical or {}).get('source'), 'dataset': (historical or {}).get('dataset'),
+                           'coverage': (historical or {}).get('coverage'),
                            'observations': history_rows,
                            'interpretation': 'Synthetic demo baseline only; not measured historical traffic.'}}
 
@@ -110,11 +116,15 @@ def prior_reports(reports):
 
 def planning_evidence(agent, graph, inputs, reports):
     graph = deepcopy(graph)
-    path = graph['alternative_connection_without_selected_edge']
-    path['complete_edge_count'] = len(path['edge_ids'])
-    path['edge_ids_excerpted'] = len(path['edge_ids']) > 12
-    path['edge_ids'] = path['edge_ids'][:12]
-    return {'agent': AGENT_BY_KEY[agent].title, 'selected_road': deepcopy(graph['selected_road']),
+    paths = ([graph['alternative_connection_without_selected_edge']] if 'selected_road' in graph
+             else graph['alternative_connections_without_each_selected_edge'])
+    for path in paths:
+        excerpt_limit = 12 if 'selected_road' in graph else 4
+        path['complete_edge_count'] = len(path['edge_ids'])
+        path['edge_ids_excerpted'] = len(path['edge_ids']) > excerpt_limit
+        path['edge_ids'] = path['edge_ids'][:excerpt_limit]
+    selection = {key: deepcopy(graph[key]) for key in ('selected_road', 'selected_area', 'selected_roads') if key in graph}
+    return {'agent': AGENT_BY_KEY[agent].title, **selection,
             'computed_network_facts': graph, 'traffic_evidence': deepcopy(inputs),
             'prior_agent_reports': prior_reports(reports), 'historical_baseline_is_synthetic': True,
             'evidence_note': 'Computed graph facts and source metrics are evidence. Prior LLM reports are unverified interpretations.',

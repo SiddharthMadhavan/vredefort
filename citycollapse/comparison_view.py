@@ -14,6 +14,7 @@ from .geometry import project
 from .presentation import display_text
 from .traffic_animation import FlowLayer
 from .traffic_rendering import TrafficPainter
+from .analysis_scope import selection_roads, selection_target, scope_label
 
 
 class ComparisonView:
@@ -29,6 +30,8 @@ class ComparisonView:
         self.window.geometry(f'{width}x{height}+30+30')
         self.window.minsize(900, 650)
         self.window.protocol('WM_DELETE_WINDOW', self.window.withdraw)
+        self.window.bind('<Return>', self.analyze_selection)
+        self.window.bind('<Escape>', lambda event: self.app.clear_selection())
         self.window.grid_columnconfigure((0, 1), weight=1, uniform='maps')
         self.window.grid_rowconfigure(3, weight=1)
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='comparison-map')
@@ -129,6 +132,10 @@ class ComparisonView:
         return ctk.CTkLabel(parent, text=text, font=self.app.small_font, text_color=color,
                            anchor='w', justify='left', height=19)
 
+    def analyze_selection(self, event=None):
+        self.app.lift()
+        return self.app.analyze_selected(event)
+
     def resize(self, event):
         width = min(canvas.winfo_width() for canvas in self.canvases)
         height = min(canvas.winfo_height() for canvas in self.canvases)
@@ -189,14 +196,19 @@ class ComparisonView:
 
     def release(self, event):
         if self.drag_origin and not self.dragged:
-            node = nearest_node(self.app.network, self.camera, event.x, event.y)
-            road = nearest_road(self.app.network, self.camera, event.x, event.y) if not node else None
-            if node:
-                self.app.select_node(node['id'])
-            elif road:
-                self.app.select_road(road.id)
+            if getattr(event, 'state', 0) & 1:
+                road = nearest_road(self.app.network, self.camera, event.x, event.y)
+                if road:
+                    self.app.toggle_area_road(road.id)
             else:
-                self.app.clear_selection()
+                node = nearest_node(self.app.network, self.camera, event.x, event.y)
+                road = nearest_road(self.app.network, self.camera, event.x, event.y) if not node else None
+                if node:
+                    self.app.select_node(node['id'])
+                elif road:
+                    self.app.select_road(road.id)
+                else:
+                    self.app.clear_selection()
         self.drag_origin = None
 
     def hide_hover(self, event=None):
@@ -269,7 +281,7 @@ class ComparisonView:
         text = 'Click a road or junction on either map'
         if selection:
             kind, identifier = selection
-            text = f'{kind.upper()} / {identifier}'
+            text = f'ROAD / {identifier}' if kind == 'road' else scope_label(self.app.network, selection_target(selection))
             if kind == 'road' and self.displayed_result_key == sim.result_key:
                 before, after = sim.baseline_result.links[identifier], sim.result.links[identifier]
                 text += f'\n{before.flow:,.0f} → {after.flow:,.0f} veh/h / {before.speed:.0f} → {after.speed:.0f} km/h'
@@ -309,7 +321,7 @@ class ComparisonView:
                 frames = []
                 for index, result in enumerate((baseline, scenario)):
                     overlay, paths = self.painters[index].frame(camera, datasets['views']['KML road graph'], result,
-                        selected=selection[1] if selection and selection[0] == 'road' else None,
+                        selected=selection_roads(network, selection),
                         impact=report if index else None, diversion=diversion if index else None,
                         datasets=datasets, heatmap=heatmap)
                     frames.append((Image.alpha_composite(base, overlay), paths))

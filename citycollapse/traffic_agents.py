@@ -6,6 +6,7 @@ from .live_traffic import LiveTrafficAnalyst, check_cancel
 from .agent_catalog import AGENTS
 from .network_analysis import network_facts
 from .planning_agents import PlanningAnalyst, compact_inputs, planning_evidence
+from .analysis_scope import scope_roads
 
 
 class TrafficAnalysts:
@@ -15,6 +16,7 @@ class TrafficAnalysts:
         self.planning = {key: PlanningAnalyst(config, key) for key in ('network', 'planner', 'review')}
 
     def analyze(self, network, road_id, cancel, emit):
+        scope_roads(network, road_id)
         reports, evidences = {}, {}
         graph = None
 
