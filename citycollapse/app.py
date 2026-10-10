@@ -20,6 +20,7 @@ from .live_traffic import AnalysisCancel, sample_road
 from .analyst_panel import AnalystPanel
 from .traffic_agents import TrafficAnalysts
 from .agent_catalog import AGENTS, agent_models
+from .simulation_controller import SimulationController
 
 BG, FG, BORDER = '#0c1510', '#abd2ad', '#3d5943'
 CENTRE = project(77.5946, 12.9716)
@@ -111,9 +112,15 @@ class CityCollapseApp(ctk.CTk):
         ctk.CTkLabel(self.details, text='CITYCOLLAPSE_', text_color=FG,
                      font=ctk.CTkFont(self.font_name, 28)).pack(
                          anchor='w', padx=16, pady=(12, 0))
-        ctk.CTkLabel(self.details, text='BENGALURU / ROAD EXPLORER',
-                     font=self.small_font, text_color='#7eaf87').pack(
-                         anchor='w', padx=16, pady=(0, 12))
+        self.subtitle = ctk.CTkLabel(self.details, text='BENGALURU / ROAD EXPLORER',
+                                     font=self.small_font, text_color='#7eaf87')
+        self.subtitle.pack(anchor='w', padx=16, pady=(0, 12))
+        self.mode_picker = ctk.CTkOptionMenu(
+            self.details, values=['Explore + agents', 'Traffic simulation'],
+            command=self.set_mode, font=self.small_font, dropdown_font=self.small_font,
+            width=266, fg_color='#15251a', button_color=BORDER, text_color=FG)
+        self.mode_picker.set('Explore + agents')
+        self.mode_picker.pack(padx=16, pady=(0, 8))
         self.detail_title = ctk.CTkLabel(
             self.details, text='Select a road or node', font=self.font,
             text_color=FG, wraplength=266, justify='left')
@@ -149,6 +156,15 @@ class CityCollapseApp(ctk.CTk):
         self.attribution.bind('<Button-1>', lambda event: webbrowser.open(
             'https://www.openstreetmap.org/copyright'))
         self.analyst_panel = AnalystPanel(self, self.font, self.small_font, self.close_analyst)
+        self.simulation = SimulationController(self, self.details)
+
+    def set_mode(self, value):
+        self.mode_picker.set(value)
+        self.simulation.set_enabled(value == 'Traffic simulation')
+        if self.selection:
+            kind, identifier = self.selection
+            self.select_road(identifier) if kind == 'road' else self.select_node(identifier)
+        self.invalidate()
 
     def clear_body(self):
         for widget in self.detail_body.winfo_children():
@@ -156,16 +172,19 @@ class CityCollapseApp(ctk.CTk):
         self.detail_body._parent_canvas.yview_moveto(0)
 
     def detail_text(self, text, muted=False):
-        ctk.CTkLabel(
+        label = ctk.CTkLabel(
             self.detail_body, text=text, font=self.small_font,
             text_color='#819487' if muted else FG, wraplength=252,
-            justify='left', anchor='w').pack(fill='x', padx=4, pady=4)
+            justify='left', anchor='w')
+        label.pack(fill='x', padx=4, pady=4)
+        return label
 
     def show_hint(self):
         self.clear_body()
         self.detail_text('Click a road to inspect its edge.\nClick a node to inspect its connections.')
         self.detail_text('Drag to pan. Scroll or use +/- to zoom.\nNodes appear when you zoom closer.', True)
         self.detail_text('Select a road, then press Enter to run all five traffic agents.', True)
+        self.detail_text('Choose Traffic simulation for hourly playback, road/junction blocks and diversions.', True)
 
     def select_road(self, identifier):
         network = self.network
@@ -189,6 +208,10 @@ class CityCollapseApp(ctk.CTk):
         self.detail_text('Source: existing KML road graph.\nConnectivity inferred from dataset coordinates.', True)
         self.button(self.detail_body, 'Analyze traffic [Enter]', self.analyze_selected,
                     width=250).pack(padx=4, pady=6)
+        self.show_simulation_details(identifier)
+        if self.simulation.enabled:
+            self.button(self.detail_body, 'Model + assumptions', self.simulation.show_model,
+                        width=250).pack(padx=4, pady=4)
         self.clear_button.configure(state='normal')
         self.invalidate()
 
@@ -215,6 +238,8 @@ class CityCollapseApp(ctk.CTk):
             button.configure(font=ctk.CTkFont(self.font_name, 15))
             button.pack(padx=4, pady=3)
         self.detail_text('Source: existing KML road graph.\nJunction topology is inferred, not surveyed.', True)
+        if self.simulation.enabled:
+            self.detail_text('Block this junction with the simulation controls above. All incident roads close in the synthetic scenario.', True)
         self.clear_button.configure(state='normal')
         self.invalidate()
 
@@ -228,6 +253,8 @@ class CityCollapseApp(ctk.CTk):
         self.invalidate()
 
     def selection_changed(self):
+        if hasattr(self, 'simulation'):
+            self.simulation.selection_changed()
         if self.agent_target and self.selection != ('road', self.agent_target):
             self.agent_cancel.set()
             self.agent_generation += 1
@@ -236,6 +263,20 @@ class CityCollapseApp(ctk.CTk):
             for spec in AGENTS:
                 self.analyst_panel.set_status('Selection changed / select a road and press Enter', agent=spec.key)
             self.analyst_panel.set_pipeline_status('Cancelled / selection changed')
+
+    def show_simulation_details(self, identifier):
+        sim = self.simulation
+        if sim.enabled and sim.result and identifier in sim.result.links:
+            state = sim.result.links[identifier]
+            text = (f'SYNTHETIC SCENARIO\nBaseline {state.baseline:,.0f} / assigned {state.flow:,.0f} veh/h\n'
+                    f'Estimated capacity {state.capacity:,.0f} veh/h\n'
+                    f'Speed {state.speed:.1f} km/h / congestion {state.congestion:.0%}\n'
+                    + ('Blocked' if state.closed else f'Travel-time multiplier {state.delay_ratio:.2f}'))
+            label = getattr(self, 'traffic_detail', None)
+            if label and label.winfo_exists():
+                label.configure(text=text)
+            else:
+                self.traffic_detail = self.detail_text(text, True)
 
     def analyze_selected(self, event=None):
         if self.network is None or not self.selection or self.selection[0] != 'road':
@@ -386,16 +427,38 @@ class CityCollapseApp(ctk.CTk):
         self.hide_hover()
 
     def resize(self, event):
+        if self.closed:
+            return
         if event.width > 0 and event.height > 0:
             if not hasattr(self, 'detail_body'):
                 return
             self.camera = replace(self.camera, width=event.width, height=event.height)
             scaling = self.details._get_widget_scaling()
-            self.detail_body.configure(height=max(150, min(350, event.height / scaling - 260)))
+            self.resize_detail_body()
             attribution_width = min(560, max(150, event.width / scaling - 32))
             self.attribution.configure(width=attribution_width, height=48,
                                        wraplength=attribution_width)
             self.invalidate()
+
+    def resize_detail_body(self):
+        if self.closed or not hasattr(self, 'detail_body'):
+            return
+        scaling = self.details._get_widget_scaling()
+        sim = getattr(self, 'simulation', None)
+        compact = sim and sim.enabled and self.camera.height / scaling < 650
+        if compact:
+            self.subtitle.pack_forget()
+            sim.legend.grid_remove()
+        else:
+            self.subtitle.pack(anchor='w', padx=16, pady=(0, 12), before=self.mode_picker)
+            if sim:
+                sim.legend.grid()
+        extra = sim.frame.winfo_reqheight() / scaling + 6 if sim and sim.enabled else 0
+        height = max(65 if extra else 150, min(350, self.camera.height / scaling - 300 - extra))
+        self.detail_body.configure(height=height)
+        # The scrollbar's default 200px request otherwise prevents the viewport
+        # from shrinking with its canvas at small window sizes.
+        self.detail_body._scrollbar.configure(height=height)
 
     def reset_camera(self):
         self.camera = replace(self.camera, x=CENTRE[0], y=CENTRE[1], zoom=11)
@@ -478,6 +541,7 @@ class CityCollapseApp(ctk.CTk):
             return
         now = time.perf_counter()
         self.poll_analyst()
+        self.simulation.tick(now)
         if self.data_future and self.data_future.done():
             future, self.data_future = self.data_future, None
             try:
@@ -536,6 +600,7 @@ class CityCollapseApp(ctk.CTk):
             return
         self.closed = True
         self.agent_cancel.set()
+        self.simulation.close()
         self.after_cancel(self.after_id)
         if self.tiles:
             self.tiles.close()

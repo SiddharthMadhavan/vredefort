@@ -12,7 +12,7 @@ class MarkdownTests(unittest.TestCase):
             '> Provider **confidence** is not match confidence.\n'))
         visible = ''.join(text for text, _ in runs)
         self.assertIn('Current situation\n', visible)
-        self.assertIn('\u2022 Speed: 28 km/h; no reported delay.', visible)
+        self.assertIn('- Speed: 28 km/h; no reported delay.', visible)
         self.assertIn('1. Freshness: observation age unknown.', visible)
         self.assertIn(('Current situation', ('heading2',)), runs)
         self.assertIn(('28 km/h', ('list', 'strong')), runs)

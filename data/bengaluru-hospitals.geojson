@@ -1,0 +1,804 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "hospital_36d158170ce4",
+      "properties": {
+        "Name": "Koramangala H.C.",
+        "Type": "BBMP Health Centre",
+        "Beds": "",
+        "Address": "Lakshman Rao Nagar, Viveknagar, Bangalore ? 47",
+        "Ward": "148",
+        "area covered": "151",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_36d158170ce4",
+        "source_file": "290b2963-4d4c-4201-b372-fb1015aca151.csv",
+        "source_row": 15,
+        "raw_values": [
+          "Koramangala H.C.",
+          "BBMP Health Centre",
+          "",
+          "Lakshman Rao Nagar, Viveknagar, Bangalore ? 47",
+          "148",
+          "151",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "UPHC, Koramangala",
+        "osm_type": "W",
+        "osm_id": 1153736760,
+        "matched_address": "5th Main Road, Ambedkarnagar, Bengaluru, 560047",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6182109,
+          12.9501568
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_28f1ceb6fb20",
+      "properties": {
+        "Name": "Kumaraswami Layout H. C.",
+        "Type": "BBMP Health Centre",
+        "Beds": "",
+        "Address": "Opp. To Police Station, K.S. Layout, Bangalore",
+        "Ward": "181",
+        "area covered": "182",
+        "Services": "",
+        "Staff": "",
+        "Contact": "22975789",
+        "id": "hospital_28f1ceb6fb20",
+        "source_file": "290b2963-4d4c-4201-b372-fb1015aca151.csv",
+        "source_row": 16,
+        "raw_values": [
+          "Kumaraswami Layout H. C.",
+          "BBMP Health Centre",
+          "",
+          "Opp. To Police Station, K.S. Layout, Bangalore",
+          "181",
+          "182",
+          "",
+          "",
+          "22975789"
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Kumaraswamy Layout UPHC",
+        "osm_type": "W",
+        "osm_id": 1271213565,
+        "matched_address": "",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5633871,
+          12.9056735
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_aeeec987229d",
+      "properties": {
+        "Name": "Austin Town Maternity Home",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "Near Austin Town Bus stop, Bangalore ? 47",
+        "Ward": "114",
+        "area covered": "115",
+        "Services": "",
+        "Staff": "",
+        "Contact": "22975868",
+        "id": "hospital_aeeec987229d",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 2,
+        "raw_values": [
+          "Austin Town Maternity Home",
+          "BBMP Maternity Home",
+          "",
+          "Near Austin Town Bus stop, Bangalore ? 47",
+          "114",
+          "115",
+          "",
+          "",
+          "22975868"
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Austin Town Maternity Home",
+        "osm_type": "W",
+        "osm_id": 1050589714,
+        "matched_address": "North Road, Austin Town, Bengaluru, 560047",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6152191,
+          12.9606664
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_f887972d056f",
+      "properties": {
+        "Name": "Azadnagar Maternity Home",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "Kasturba Nagar, Mysore Road, Bangalore ? 26",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_f887972d056f",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 3,
+        "raw_values": [
+          "Azadnagar Maternity Home",
+          "BBMP Maternity Home",
+          "",
+          "Kasturba Nagar, Mysore Road, Bangalore ? 26",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Azad Nagar Maternity Home",
+        "osm_type": "N",
+        "osm_id": 6944464994,
+        "matched_address": "Bengaluru Urban, 560026",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5485635,
+          12.9559644
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_4b69233d835b",
+      "properties": {
+        "Name": "Dasappa Maternity Home",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "Near Town Hall, SGPS, Bangalore ? 02",
+        "Ward": "110",
+        "area covered": "119",
+        "Services": "",
+        "Staff": "",
+        "Contact": "22975684",
+        "id": "hospital_4b69233d835b",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 7,
+        "raw_values": [
+          "Dasappa Maternity Home",
+          "BBMP Maternity Home",
+          "",
+          "Near Town Hall, SGPS, Bangalore ? 02",
+          "110",
+          "119",
+          "",
+          "",
+          "22975684"
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Dasappa Maternity Hospital",
+        "osm_type": "W",
+        "osm_id": 161984945,
+        "matched_address": "Pehalwan Krishnappa Road, Bengaluru Urban, Bengaluru, 560002",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5845256,
+          12.9643477
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_80c11de343a0",
+      "properties": {
+        "Name": "Gavipuram Guttahalli Maternity Home ",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "Near Police Station, Kempe Gowda Nagar, Bangalore ? 18",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_80c11de343a0",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 9,
+        "raw_values": [
+          "Gavipuram Guttahalli Maternity Home ",
+          "BBMP Maternity Home",
+          "",
+          "Near Police Station, Kempe Gowda Nagar, Bangalore ? 18",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Gavipuramguttahalli Maternity Home",
+        "osm_type": "N",
+        "osm_id": 6944269353,
+        "matched_address": "9th Cross Road, Bengaluru Urban, Bengaluru, 560018",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5548633,
+          12.9526505
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_b7f560755e9f",
+      "properties": {
+        "Name": "Magadi Road Maternity Home",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "2nd Cross, Near BWSSB Water Tank, Magadi Road, Bangalore ? 23",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_b7f560755e9f",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 12,
+        "raw_values": [
+          "Magadi Road Maternity Home",
+          "BBMP Maternity Home",
+          "",
+          "2nd Cross, Near BWSSB Water Tank, Magadi Road, Bangalore ? 23",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Magadi Road Maternity Home",
+        "osm_type": "N",
+        "osm_id": 6947003707,
+        "matched_address": "Magadi Road, Bengaluru Urban, Bengaluru, 560023",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.561823,
+          12.9741253
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_344c1a31245d",
+      "properties": {
+        "Name": "Palace Guttahalli Maternity Home",
+        "Type": "BBMP Maternity Home",
+        "Beds": "",
+        "Address": "City Corporation Maternity Home. Palace Guttahalli, Bangalore ? 03",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "22975666",
+        "id": "hospital_344c1a31245d",
+        "source_file": "81174030-2f7d-4e59-90f0-b59352b306a8.csv",
+        "source_row": 17,
+        "raw_values": [
+          "Palace Guttahalli Maternity Home",
+          "BBMP Maternity Home",
+          "",
+          "City Corporation Maternity Home. Palace Guttahalli, Bangalore ? 03",
+          "",
+          "",
+          "",
+          "",
+          "22975666"
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Place Guttahalli Maternity Home",
+        "osm_type": "N",
+        "osm_id": 6939699617,
+        "matched_address": "Sheshadripuram Main Road, Bengaluru Urban, Bengaluru, 560003",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5819892,
+          12.9988238
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_255cabb1994e",
+      "properties": {
+        "Name": "H. Siddaiah Road Hospital",
+        "Type": "BBMP Referral Hospital",
+        "Beds": "",
+        "Address": "Next to Lions Eye Hosital, Off J. C. Road, H. Siddaiah Road, Bangalore ? 02",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_255cabb1994e",
+        "source_file": "2547bb23-9022-4766-a31c-bd5fb2eae796.csv",
+        "source_row": 2,
+        "raw_values": [
+          "H. Siddaiah Road Hospital",
+          "BBMP Referral Hospital",
+          "",
+          "Next to Lions Eye Hosital, Off J. C. Road, H. Siddaiah Road, Bangalore ? 02",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "H Siddiah Referral Hospital",
+        "osm_type": "N",
+        "osm_id": 12541779301,
+        "matched_address": "H. Siddaiah Road, Hombegowda Nagara, Bengaluru, 560002",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5824398,
+          12.9569057
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_288956f926cd",
+      "properties": {
+        "Name": "Hosahalli Referral Hospital",
+        "Type": "BBMP Referral Hospital",
+        "Beds": "",
+        "Address": "Near Jayamunirao Circle, Vijayanagar, 5th Main, M. C. Layout, Vijayanagar, Bangalore ? 40",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_288956f926cd",
+        "source_file": "2547bb23-9022-4766-a31c-bd5fb2eae796.csv",
+        "source_row": 3,
+        "raw_values": [
+          "Hosahalli Referral Hospital",
+          "BBMP Referral Hospital",
+          "",
+          "Near Jayamunirao Circle, Vijayanagar, 5th Main, M. C. Layout, Vijayanagar, Bangalore ? 40",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Goverment Hospital, Hosahalli",
+        "osm_type": "N",
+        "osm_id": 7572526698,
+        "matched_address": "Vijayanagar Water Tank Road, Bengaluru Urban, Bengaluru, 560040",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5342045,
+          12.9744928
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "hospital_aa95472f02c4",
+      "properties": {
+        "Name": "Banashankari Referral Hospital",
+        "Type": "BBMP Referral Hospital",
+        "Beds": "",
+        "Address": "Near Police Station, 27th Cross, 17th Main, 2nd Stage, Banashankari, Bangalore ? 70",
+        "Ward": "",
+        "area covered": "",
+        "Services": "",
+        "Staff": "",
+        "Contact": "",
+        "id": "hospital_aa95472f02c4",
+        "source_file": "2547bb23-9022-4766-a31c-bd5fb2eae796.csv",
+        "source_row": 7,
+        "raw_values": [
+          "Banashankari Referral Hospital",
+          "BBMP Referral Hospital",
+          "",
+          "Near Police Station, 27th Cross, 17th Main, 2nd Stage, Banashankari, Bangalore ? 70",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "match_status": "inferred_facility_match",
+        "matched_name": "Banashankari Referral Hospital",
+        "osm_type": "N",
+        "osm_id": 2123630630,
+        "matched_address": "27th Cross Road, Bengaluru Urban, 560070",
+        "geocoder": "OpenStreetMap facility matching"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5642974,
+          12.9231342
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_d6d6d85bbbb7",
+      "properties": {
+        "Name": "Jayanagar General Hospital",
+        "latitude": 12.9262,
+        "longitude": 77.5928,
+        "Address": "32nd Cross, 4th B Block, Beside Rajiv Gandhi Health Institute, Tilak Nagar, Bengaluru, Karnataka 560041",
+        "search_query": "jayanagar general hospital",
+        "id": "provided_hospital_d6d6d85bbbb7",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=jayanagar+general+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5928,
+          12.9262
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_4be9c1e9d676",
+      "properties": {
+        "Name": "Epidemic Disease Hospital",
+        "latitude": 12.986,
+        "longitude": 77.6443,
+        "Address": "Indira Nagar I Stage, Hoysala Nagar, Indiranagar, Bengaluru, Karnataka 560038",
+        "search_query": "epidemic disease hospital",
+        "id": "provided_hospital_4be9c1e9d676",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=epidemic+disease+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6443,
+          12.986
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_43408cfe129d",
+      "properties": {
+        "Name": "Bowring and Lady Curzun Hospital",
+        "latitude": 12.9822,
+        "longitude": 77.6041,
+        "Address": "Lady Curzon Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka 560001",
+        "search_query": "bowring & lady curzon hospital bangalore",
+        "id": "provided_hospital_43408cfe129d",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=bowring+%26+lady+curzon+hospital+bangalore",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6041,
+          12.9822
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_f9ceb6045758",
+      "properties": {
+        "Name": "KC General Hospital",
+        "latitude": 12.9961,
+        "longitude": 77.5694,
+        "Address": "#89, 5th Cross Road, Behind Police Station, Malleswaram, Bengaluru, Karnataka 560003",
+        "search_query": "kc general hospital malleswaram",
+        "id": "provided_hospital_f9ceb6045758",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=kc+general+hospital+malleswaram",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5694,
+          12.9961
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_282446a26011",
+      "properties": {
+        "Name": "Rajiv Gandhi Institute of Chest Diseases (RGICD)",
+        "latitude": 12.9383,
+        "longitude": 77.5907,
+        "Address": "Someshwarnagar 1st Main Road, Dharmaram College Post, 1st Block, Hombegowda Nagar, Bengaluru, Karnataka 560029",
+        "search_query": "rajiv gandhi institute of chest diseases bangalore karnataka address",
+        "id": "provided_hospital_282446a26011",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=rajiv+gandhi+institute+of+chest+diseases+bangalore+karnataka+address",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5907,
+          12.9383
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_2b1bc68a6bd0",
+      "properties": {
+        "Name": "Manipal Hospital",
+        "latitude": 12.9584,
+        "longitude": 77.6488,
+        "Address": "98, HAL Old Airport Rd, Kodihalli, Bengaluru, Karnataka 560017",
+        "search_query": "manipal hospital HAL",
+        "id": "provided_hospital_2b1bc68a6bd0",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=manipal+hospital+HAL",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6488,
+          12.9584
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_67669c577c2e",
+      "properties": {
+        "Name": "Narayana Health",
+        "latitude": 12.8096,
+        "longitude": 77.6955,
+        "Address": "258/A, Bommasandra Industrial Area Anekal Taluk, Hosur Rd, Bengaluru, Karnataka 560099",
+        "search_query": "narayana health",
+        "id": "provided_hospital_67669c577c2e",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=narayana+health",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.6955,
+          12.8096
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_5b840bac4272",
+      "properties": {
+        "Name": "Fortis Hospital",
+        "latitude": 12.8948,
+        "longitude": 77.5986,
+        "Address": "154, 9, Bannerghatta Main Rd, Opposite IIM, Sahyadri Layout, Panduranga Nagar, Bengaluru, Karnataka 560076",
+        "search_query": "fortis hospital bannerghatta road",
+        "id": "provided_hospital_5b840bac4272",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=fortis+hospital+bannerghatta+road",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5986,
+          12.8948
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_71bf64ef45ea",
+      "properties": {
+        "Name": "Victoria Hospital",
+        "latitude": 12.9636,
+        "longitude": 77.5738,
+        "Address": "Fort Rd, near City Market, New Tharagupet, Bengaluru - 560002",
+        "search_query": "victoria hospital",
+        "id": "provided_hospital_71bf64ef45ea",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=victoria+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5738,
+          12.9636
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_4495b0c69978",
+      "properties": {
+        "Name": "Indiranagar General Hospital",
+        "latitude": 12.9829,
+        "longitude": 77.645,
+        "Address": "68/1, 4th B Cross Road, Michael Palaya, Indiranagar, Bengaluru -560038",
+        "search_query": "indiranagar general hospital",
+        "id": "provided_hospital_4495b0c69978",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=indiranagar+general+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.645,
+          12.9829
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_14ccb7ace8ce",
+      "properties": {
+        "Name": "ESIC Model Hospital",
+        "latitude": 12.9917,
+        "longitude": 77.5539,
+        "Address": "620/A/1, 12th Main Rd, 2nd Block, Rajajinagar, Bengaluru - 560010",
+        "search_query": "esic hospital rajajinagar",
+        "id": "provided_hospital_14ccb7ace8ce",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=esic+hospital+rajajinagar",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5539,
+          12.9917
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_a37cc766cdd9",
+      "properties": {
+        "Name": "General Hospital, Devanhalli",
+        "latitude": 13.2437,
+        "longitude": 77.7172,
+        "Address": "SH 96, Devanahalli, Binnamangala -562110",
+        "search_query": "general hospital devanahalli",
+        "id": "provided_hospital_a37cc766cdd9",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=general+hospital+devanahalli",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.7172,
+          13.2437
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_e83a1f97e180",
+      "properties": {
+        "Name": "BGS GIMS Hospital",
+        "latitude": 12.903,
+        "longitude": 77.4975,
+        "Address": "Uttar Halli Kengeri Main Rd, Sunkalpalya, Bengaluru- 560060",
+        "search_query": "bgs hospital",
+        "id": "provided_hospital_e83a1f97e180",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=bgs+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.4975,
+          12.903
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "provided_hospital_740a1c69328f",
+      "properties": {
+        "Name": "Rajarajeshwari Medical College and Hospital",
+        "latitude": 12.8955,
+        "longitude": 77.4612,
+        "Address": "202, Mysore Road Kambipura, Bengaluru -560074",
+        "search_query": "rajarajeshwari hospital",
+        "id": "provided_hospital_740a1c69328f",
+        "source_file": "hospitals-provided-coordinates.json",
+        "coordinate_source": "User-provided latitude/longitude",
+        "Type": "Hospital",
+        "search_url": "https://www.google.com/search?q=rajarajeshwari+hospital",
+        "match_status": "provided_coordinates"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.4612,
+          12.8955
+        ]
+      }
+    }
+  ]
+}

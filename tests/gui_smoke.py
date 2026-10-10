@@ -62,8 +62,8 @@ def check():
             assert app.camera.zoom == 11
             assert len(app.network.roads) == 4448
             assert len(app.network.nodes) == 3309
-            assert 'citycollapse.traffic' not in sys.modules
-            assert 'citycollapse.simulation' not in sys.modules
+            assert app.simulation.model is None and app.simulation.load_future is None
+            assert not app.simulation.enabled, 'Simulation should load only when selected'
             assert app.tiles and app.tiles.images, 'No real basemap tiles loaded'
             # Pick a central road segment sufficiently far from node hit targets.
             road = app.network.roads_by_id['kml_merged_e_19725_0_1']

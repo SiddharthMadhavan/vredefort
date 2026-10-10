@@ -127,6 +127,9 @@ with tempfile.TemporaryDirectory() as temporary, fixture_server(chat_delay=.3) a
                     return
                 assert panel.winfo_width() <= app.winfo_width() / 2 + 2
                 reply = panel.replies['review']
+                if reply.winfo_rooty() + reply.winfo_height() > panel.winfo_rooty() + panel.winfo_height():
+                    app.after(50, check)
+                    return
                 assert reply.winfo_height() >= 60, 'Agent picker/headers squeezed out the reply'
                 assert reply.winfo_rooty() + reply.winfo_height() <= panel.winfo_rooty() + panel.winfo_height()
                 app.analyze_selected()

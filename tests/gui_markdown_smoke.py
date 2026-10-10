@@ -35,7 +35,7 @@ try:
     reply = panel.reply
     content = reply.get('1.0', 'end-1c')
     assert '**' not in content and '##' not in content and '```' not in content
-    assert '\u2022 Speed: 28 km/h' in content
+    assert '- Speed: 28 km/h' in content
     for tag in ('heading2', 'heading3', 'strong', 'emphasis', 'list', 'code', 'code_block', 'quote'):
         assert reply.tag_ranges(tag), f'Missing rendered style: {tag}'
     old_font = reply.tag_cget('heading2', 'font')
