@@ -1,17 +1,21 @@
-﻿"""Exercise a real CustomTkinter window and asynchronous traffic controls."""
-import sys
-from pathlib import Path
-import time
+﻿"""Exercise the real map-only CustomTkinter window and its canvas bindings."""
 from dataclasses import replace
+from pathlib import Path
+import os
+import sys
+import time
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from PIL import ImageGrab
-from citycollapse.app import CityCollapseApp
+from citycollapse.app import CityCollapseApp, CENTRE
+from citycollapse.explore_map import nearest_node, nearest_road
 
 app = CityCollapseApp()
-errors, stages = [], []
+errors = []
 started = time.monotonic()
-first_trail = None
-capture_prepared = False
+stage = 'startup'
+expected_road = None
+expected_node = None
+saved_selection = None
 
 
 def callback_error(kind, error, traceback):
@@ -23,179 +27,144 @@ def callback_error(kind, error, traceback):
 app.report_callback_exception = callback_error
 
 
-def capture(path):
-    if sys.platform == 'win32':
-        # Capture this window even when the user is working in another app.
-        ImageGrab.grab(window=app.winfo_id()).save(path)
-    else:
-        ImageGrab.grab(bbox=(app.winfo_rootx(), app.winfo_rooty(), app.winfo_rootx() + app.winfo_width(),
-                            app.winfo_rooty() + app.winfo_height())).save(path)
+def settled():
+    return app.map_image and app.display_camera == app.camera and not app.dirty and not app.render_future
 
 
-def ready():
-    return app.traffic_result and app.result_key == app.requested_key and not app.traffic_future
+def click(x, y):
+    app.canvas.event_generate('<ButtonPress-1>', x=round(x), y=round(y))
+    app.canvas.event_generate('<ButtonRelease-1>', x=round(x), y=round(y))
+
+
+def texts():
+    return '\n'.join(str(w.cget('text')) for w in app.detail_body.winfo_children())
 
 
 def check():
-    global first_trail, capture_prepared
+    global stage, expected_road, expected_node, saved_selection
     try:
-        if time.monotonic() - started > 90:
-            raise AssertionError(f'GUI timed out at {stages}')
-        if not app.datasets or not app.map_image or not ready():
+        assert time.monotonic() - started < 60, f'Timed out at {stage}'
+        assert not app.dataset_error, app.dataset_error
+        assert not app.render_error, app.render_error
+        if not app.network or not settled():
             app.after(100, check)
             return
-        if not stages:
-            if not app.traffic_image:
+        if stage == 'startup' and app.tiles and not app.tiles.images:
+            app.after(100, check)
+            return
+        if stage in ('capture', 'capture ready'):
+            keys = app.camera.tile_keys()
+            assert not any(key in app.tiles.failed for key in keys), 'Basemap tile download failed'
+            if any(key not in app.tiles.images for key in keys):
                 app.after(100, check)
                 return
-            assert app.mode == 'Traffic simulation'
-            assert app.font_name == 'VT323'
-            assert len(app.traffic_result.links) == 4448
-            assert app.flow_layer.trails
-            first_trail = next(item for item in app.flow_layer.items if app.canvas.itemcget(item, 'state') == 'normal')
-            stages.append(tuple(app.canvas.coords(first_trail)))
-            app.set_playback_speed('3600x')
-            app.toggle_simulation()
-            stages.append('playing')
-            app.after(650, check)
-            return
-        stage = stages[-1]
-        if stage == 'playing':
-            assert app.clock_s > 200
-            assert tuple(app.canvas.coords(first_trail)) != stages[0], 'Flow trail did not move'
-            app.toggle_simulation()
-            image_before_seek = app.canvas.itemcget(app.traffic_item, 'image')
-            app.seek_hour(8)
-            assert app.canvas.itemcget(app.traffic_item, 'image') == image_before_seek, 'Seeking cleared the traffic image'
-            stages.append('hour')
-        elif stage == 'hour':
-            assert app.traffic_result.hour == 8 and not app.running
-            app.hospitals_var.set(False)
-            app.fire_var.set(False)
-            road = app.datasets['views']['KML road graph']['roads'][0]
-            point = road.paths[0][len(road.paths[0]) // 2]
-            app.camera = replace(app.camera, x=point[0], y=point[1], zoom=16)
-            app.show_all()
-            app.pick(app.camera.width / 2, app.camera.height / 2)
-            assert app.action_target and app.action_target[0] == 'edge', app.action_target
-            app.toggle_block_target()
-            assert app.action_target[1] in app.flow_layer.blocked
-            assert app.canvas.itemcget(app.traffic_item, 'image'), 'Blocking cleared the traffic image'
-            stages.append('road blocked')
-        elif stage == 'road blocked':
-            identifier = next(iter(app.blocked_edges))
-            assert app.traffic_result.links[identifier].closed
-            assert app.traffic_result.links[identifier].flow == 0
-            r = app.traffic_result
-            assert abs(r.affected_demand - r.rerouted_demand - r.unmet_demand) < 1e-6
-            assert app.block_button.cget('text') == 'Unblock road'
-            app.toggle_block_target()
-            stages.append('road restored')
-        elif stage == 'road restored':
-            assert not any(s.closed for s in app.traffic_result.links.values())
-            node = next(n for n in app.datasets['views']['KML road graph']['nodes'] if n['degree'] >= 3)
+        if stage == 'startup':
+            assert app.camera.zoom == 11
+            assert len(app.network.roads) == 4448
+            assert len(app.network.nodes) == 3309
+            assert app.simulation.model is None and app.simulation.load_future is None
+            assert not app.simulation.enabled, 'Simulation should load only when selected'
+            assert app.tiles and app.tiles.images, 'No real basemap tiles loaded'
+            # Pick a central road segment sufficiently far from node hit targets.
+            road = app.network.roads_by_id['kml_merged_e_19725_0_1']
+            found = False
+            for a, b in zip(road.paths[0], road.paths[0][1:]):
+                point = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+                camera = replace(app.camera, x=point[0], y=point[1], zoom=16)
+                x, y = camera.width / 2, camera.height / 2
+                if not nearest_node(app.network, camera, x, y):
+                    candidate = nearest_road(app.network, camera, x, y)
+                    if candidate and candidate.id == road.id:
+                        app.camera = camera
+                        found = True
+                        break
+            assert found, 'No suitable road click target'
+            app.invalidate()
+            stage = 'road'
+        elif stage == 'road':
+            x, y = app.camera.width / 2, app.camera.height / 2
+            click(x, y)
+            expected_road = 'kml_merged_e_19725_0_1'
+            assert app.selection == ('road', expected_road), app.selection
+            assert expected_road in texts() and 'Length' in texts()
+            inset = round(16 * app.details._get_widget_scaling())
+            assert int(app.details.place_info()['x']) == inset
+            assert int(app.details.place_info()['y']) == inset
+            expected_node = app.network.roads_by_id[expected_road].properties['source']
+            # Exercise the endpoint shortcut in the left panel.
+            button = next(w for w in app.detail_body.winfo_children()
+                          if str(w.cget('text')).startswith('Inspect node'))
+            button.invoke()
+            assert app.selection == ('node', expected_node)
+            assert expected_node in texts() and 'Connected edges' in texts()
+            node = app.network.nodes_by_id[expected_node]
             app.camera = replace(app.camera, x=node['point'][0], y=node['point'][1], zoom=16)
-            app.show_all()
-            app.pick(app.camera.width / 2, app.camera.height / 2)
-            assert app.action_target == ('node', node['id'])
-            app.toggle_block_target()
-            stages.append('junction blocked')
-        elif stage == 'junction blocked':
-            node = next(iter(app.blocked_nodes))
-            incident_ids = [e['id'] for e in app.traffic_model.edges if node in (e['source'], e['target'])]
-            assert incident_ids and all(app.traffic_result.links[e].closed and app.traffic_result.links[e].flow == 0 for e in incident_ids)
-            app.clear_blocks()
-            stages.append('clear')
-        elif stage == 'clear':
-            assert not app.blocked_edges and not app.blocked_nodes
-            assert not any(s.closed for s in app.traffic_result.links.values())
-            app.inspect_affected_road('kml_merged_e_19725_0_1')
-            app.toggle_block_target()
-            stages.append('impact report')
-        elif stage == 'impact report':
-            report = app.impact_report
-            assert len(report.loaded_roads) == 55
-            assert len(report.facilities) == 3
-            assert len(report.diversions) == 3
-            if not app.impact_panel.winfo_ismapped() and app.impact_panel.place_info():
-                app.after(100, check)
-                return
-            assert app.impact_panel.winfo_ismapped(), (app.sim_status.cget('text'), app.impact_panel.place_info(), app.pinned)
-            app.impact_panel.set_tab('Roads')
-            assert app.impact_panel.next.cget('state') == 'normal'
-            app.impact_panel.turn_page(1)
-            assert app.impact_panel.page_label.cget('text') == '31-56 / 56'
-            app.impact_panel.set_tab('Diversions')
-            app.preview_diversion(report.diversions[0])
-            assert app.active_diversion == report.diversions[0]
-            stages.append('impact capture')
-        elif stage == 'impact capture':
-            if app.traffic_painted_revision != app.traffic_revision or app.traffic_fade_to is not None:
-                app.after(100, check)
-                return
-            if not capture_prepared:
-                # Tk may retain an old native backing buffer while fully occluded.
-                # Briefly expose this test window before capturing its actual UI.
-                capture_prepared = True
+            app.invalidate()
+            stage = 'node'
+        elif stage == 'node':
+            app.clear_selection()
+            x, y = app.camera.width / 2, app.camera.height / 2
+            app.canvas.event_generate('<Motion>', x=round(x), y=round(y))
+            assert app.canvas.coords(app.hover_item)[0] >= 0
+            click(x, y)
+            assert app.selection == ('node', expected_node), app.selection
+            assert 'Longitude / latitude' in texts()
+            for edge_id in app.network.edge_ids[expected_node]:
+                assert edge_id in texts()
+            saved_selection = app.selection
+            old = app.camera
+            app.canvas.event_generate('<MouseWheel>', delta=120, x=round(x), y=round(y))
+            assert app.camera.zoom == old.zoom + 1
+            for a, b in zip(old.world(round(x), round(y)), app.camera.world(round(x), round(y))):
+                assert abs(a - b) < 1e-12, 'Zoom moved pointer world position'
+            assert app.selection == saved_selection
+            stage = 'drag'
+        elif stage == 'drag':
+            old = app.camera
+            x, y = old.width // 2, old.height // 2
+            app.canvas.event_generate('<ButtonPress-1>', x=x, y=y)
+            app.canvas.event_generate('<B1-Motion>', x=x + 80, y=y + 40)
+            app.canvas.event_generate('<ButtonRelease-1>', x=x + 80, y=y + 40)
+            assert app.selection == saved_selection, 'Dragging selected another feature'
+            assert abs(app.camera.x - (old.x - 80 / old.scale)) < 1e-12
+            assert abs(app.camera.y - (old.y - 40 / old.scale)) < 1e-12
+            old = app.camera
+            app.canvas.event_generate('<Right>')
+            assert app.camera.x > old.x, 'Keyboard pan failed'
+            stage = 'capture'
+        elif stage == 'capture':
+            if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT'):
                 app.lift()
-                app.after(200, check)
-                return
-            folder = Path('.tmp'); folder.mkdir(exist_ok=True)
-            assert app.traffic_bitmap_camera == app.camera
-            assert not app.traffic_render_error, app.traffic_render_error
-            app.traffic_display_bitmap.save(folder / 'impact-layer.png')
-            capture(folder / 'impact-smoke.png')
-            assert app.impact_panel.winfo_y() + app.impact_panel.winfo_height() < app.winfo_height() - 10, (
-                app.impact_panel.winfo_y(), app.impact_panel.winfo_height(), app.winfo_height(),
-                app.impact_panel.body.cget('height'), app.impact_panel.note.winfo_height())
-            facility = app.impact_report.facilities[0]
-            point = app.datasets[facility.kind][facility.index]['point']
-            app.camera = replace(app.camera, x=point[0], y=point[1], zoom=16)
-            app.pick(app.camera.width / 2, app.camera.height / 2)
-            assert app.detail_title.cget('text') == app.impact_report.facilities[0].name
-            assert 'no outage' in app.detail_body.cget('text')
-            app.show_impacts()
-            assert app.impact_panel.place_info()
-            app.seek_hour(9)
-            stages.append('impact hour')
-        elif stage == 'impact hour':
-            assert app.impact_panel.winfo_ismapped()
-            assert app.impact_panel.result.hour == 9
-            app.clear_blocks()
-            stages.append('final clear')
-        elif stage == 'final clear':
-            assert not app.impact_report.affected_roads
-            assert not app.impact_panel.winfo_ismapped()
-            app.set_mode('KML width shading')
-            app.set_width_field('RR_width_B')
-            app.set_mode('OSM road graph')
-            app.set_mode('Traffic simulation')
-            app.hospitals_var.set(True)
-            hospital = app.datasets['hospitals'][0]
-            app.camera = replace(app.camera, x=hospital['point'][0], y=hospital['point'][1])
-            app.pick(app.camera.width / 2, app.camera.height / 2)
-            assert app.detail_title.cget('text') == hospital['Name']
-            app.show_all()
-            app.fire_var.set(True)
-            station = app.datasets['fire'][0]
-            app.camera = replace(app.camera, x=station['point'][0], y=station['point'][1])
-            app.pick(app.camera.width / 2, app.camera.height / 2)
-            assert app.detail_title.cget('text') == station['FIRE_STAName']
-            app.show_all()
-            app.reset_camera()
-            app.set_playback_speed('60x')
-            app.flow_var.set(False)
-            app.refresh_traffic_layer()
-            app.pinned = True
-            stages.append('capture')
-            app.after(3000, check)
+            stage = 'capture ready'
+            app.after(250, check)
             return
-        else:
-            assert app.traffic_image
-            folder = Path('.tmp')
-            folder.mkdir(exist_ok=True)
-            capture(folder / 'traffic-smoke.png')
-            print(f'GUI smoke passed: continuous flow, closures, complete impact pagination, 55 loaded roads, 3 facilities, 3 diversion previews, hourly report updates and clearing; {len(app.tiles.images)} basemap tiles.', flush=True)
+        elif stage == 'capture ready':
+            if os.environ.get('CITYCOLLAPSE_SMOKE_SCREENSHOT') and sys.platform == 'win32':
+                from PIL import ImageGrab
+                folder = Path('.tmp')
+                folder.mkdir(exist_ok=True)
+                ImageGrab.grab(window=app.winfo_id()).save(folder / 'map-explorer.png')
+            assert app.details.winfo_y() + app.details.winfo_height() < app.winfo_height() - 30
+            # Preview selection can be cleared without disturbing camera position.
+            camera = app.camera
+            app.clear_button.invoke()
+            assert app.selection is None and app.camera == camera
+            app.reset_camera()
+            assert (app.camera.x, app.camera.y) == CENTRE and app.camera.zoom == 11
+            app.geometry('760x520')
+            stage = 'small window'
+        elif stage == 'small window':
+            assert app.details.winfo_y() + app.details.winfo_height() < app.winfo_height() - 30, (
+                app.details.winfo_y(), app.details.winfo_height(), app.winfo_height())
+            app.camera = replace(app.camera, zoom=18)
+            app.zoom(1)
+            assert app.camera.zoom == 18
+            app.camera = replace(app.camera, zoom=8)
+            app.zoom(-1)
+            assert app.camera.zoom == 8
+            print('GUI smoke passed: real basemap, clickable roads/nodes, left details, '
+                  'endpoint shortcuts, hover, anchored zoom, drag/keyboard pan, reset, '
+                  'clearing selection and small-window layout.', flush=True)
             app.close()
             return
         app.after(150, check)
@@ -203,10 +172,11 @@ def check():
         import traceback
         traceback.print_exc()
         errors.append(error)
+        print('GUI smoke failed:', repr(error), flush=True)
         app.close()
 
 
-app.after(250, check)
+app.after(100, check)
 app.mainloop()
 if errors:
     raise SystemExit(1)

@@ -49,6 +49,7 @@ class ImpactPanel(ctk.CTkFrame):
         self.report, self.result = report, result
         self.summary.configure(text=f'{len(report.closed_roads)} blocked / {len(report.loaded_roads)} roads with extra traffic\n'
                                     f'{len(report.affected_nodes)} connected nodes / {len(report.facilities)} nearby facilities\n'
+                                    f'Synthetic: rerouted {result.rerouted_demand:,.0f} / unmet {result.unmet_demand:,.0f} veh/h\n'
                                     'RED: blocked / GOLD: changed / CYAN: detours')
         self.render_page()
 
@@ -91,7 +92,7 @@ class ImpactPanel(ctk.CTkFrame):
             self.note.configure(text=f'Within {r.radius_m:g}m of affected roads. Potential access delay; proximity does not establish an outage. Only mapped facilities are included.')
         else:
             items = list(r.diversions) + list(r.unavailable)
-            self.note.configure(text='Up to 3 shortest feasible detours per blocked road; junction routes show assigned flow. Click to preview. Graph turn restrictions are unavailable.')
+            self.note.configure(text='Up to 3 shortest graph paths per blocked road; junction routes show assigned flow. Click to preview. Undirected graph: legal turns and one-way restrictions are unknown; routes need verification.')
         pages = max(1, (len(items) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
         self.page = min(self.page, pages - 1)
         start = self.page * self.PAGE_SIZE

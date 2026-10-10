@@ -140,7 +140,7 @@ class FlowLayer:
         self.dirty = True
 
     def install(self, camera, paths, elapsed=0.0):
-        from .map_renderer import traffic_color
+        from .traffic_rendering import traffic_color
         previous = self.origins if camera == self.camera else {}
         origins = {}
         self.camera, self.trails = camera, []

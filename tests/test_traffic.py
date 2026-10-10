@@ -5,7 +5,8 @@ from concurrent.futures import CancelledError
 from threading import Event
 from citycollapse.data import DATA, load_json
 from citycollapse.traffic import TrafficDataset, TrafficModel, FIELDS
-from citycollapse.map_renderer import traffic_color
+from citycollapse.traffic_rendering import traffic_color
+from citycollapse.simulation_data import load_simulation_data
 
 
 def model_fixture(edges, volumes=None, capacity=100):
@@ -114,7 +115,7 @@ class ActualTrafficTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dataset = TrafficDataset.load(DATA)
-        cls.model = TrafficModel(load_json('bengaluru-kml-road-graph.json'), cls.dataset)
+        _, cls.model = load_simulation_data()
 
     def test_actual_coverage_and_finite_capacities(self):
         d = self.dataset

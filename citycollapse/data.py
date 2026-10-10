@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from .geometry import project, cumulative_lengths
+from .geometry import project
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data'
@@ -77,16 +77,3 @@ def read_points(name):
         coordinate = feature['geometry']['coordinates'][:2]
         points.append({**feature['properties'], 'coordinate': coordinate, 'point': project(*coordinate)})
     return points, SpatialIndex((*point['point'], *point['point']) for point in points)
-
-def load_datasets():
-    views = {}
-    for mode, file in [('KML width shading', 'bengaluru-road-widths.geojson'), ('KML road graph', 'bengaluru-kml-road-edges.geojson'), ('OSM road graph', 'bengaluru-road-edges.geojson')]:
-        roads, index = read_roads(file)
-        node_file = 'bengaluru-road-nodes.geojson' if mode == 'OSM road graph' else 'bengaluru-kml-road-nodes.geojson'
-        nodes, node_index = read_points(node_file)
-        views[mode] = {'roads': roads, 'index': index, 'by_id': {road.id: road for road in roads}, 'nodes': nodes, 'node_index': node_index}
-    graph = load_json('bengaluru-kml-road-graph.json')
-    views['Traffic simulation'] = views['KML road graph']
-    for edge in graph['edges']:
-        edge['cumulative'] = cumulative_lengths(edge['coordinates'])
-    return {'views': views, 'graph': graph, 'hospitals': read_points('bengaluru-hospitals.geojson')[0], 'fire': read_points('bengaluru-fire-stations.geojson')[0], 'width_metadata': load_json('bengaluru-road-widths.metadata.json'), 'hospital_metadata': load_json('bengaluru-hospitals.metadata.json')}

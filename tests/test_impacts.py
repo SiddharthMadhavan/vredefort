@@ -1,6 +1,7 @@
 from dataclasses import replace
 import unittest
-from citycollapse.data import Road, SpatialIndex, load_datasets, DATA
+from citycollapse.data import Road, SpatialIndex, DATA
+from citycollapse.simulation_data import load_simulation_data
 from citycollapse.geometry import project
 from citycollapse.impacts import nearby_facilities, build_impact_report
 from citycollapse.traffic import TrafficDataset, TrafficModel
@@ -62,8 +63,7 @@ class ImpactTests(unittest.TestCase):
 class ActualImpactTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.data = load_datasets()
-        cls.model = TrafficModel(cls.data['graph'], TrafficDataset.load(DATA))
+        cls.data, cls.model = load_simulation_data()
 
     def test_actual_report_includes_every_changed_road_and_feasible_preview(self):
         identifier = 'kml_merged_e_8287_0_22'
