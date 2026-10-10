@@ -15,6 +15,7 @@ from .traffic_animation import FlowLayer
 from .traffic_rendering import TrafficPainter
 from .presentation import display_text
 from .analysis_scope import selection_roads
+from .emergency_controller import EmergencyController
 
 
 class SimulationController:
@@ -68,8 +69,8 @@ class SimulationController:
         self.block_button = app.button(self.frame, 'Select to block', self.toggle_block,
                                         width=112, state='disabled')
         self.block_button.grid(row=4, column=0, padx=3, pady=3, sticky='ew')
-        app.button(self.frame, 'Clear blocks', self.clear_blocks, width=112).grid(
-            row=4, column=1, padx=3, pady=3, sticky='ew')
+        self.clear_button = app.button(self.frame, 'Clear blocks', self.clear_blocks, width=112)
+        self.clear_button.grid(row=4, column=1, padx=3, pady=3, sticky='ew')
         self.impact_button = app.button(self.frame, 'Impacts / routes', self.show_impacts,
                                          width=112, state='disabled')
         self.impact_button.grid(row=5, column=0, padx=3, pady=3, sticky='ew')
@@ -77,7 +78,30 @@ class SimulationController:
         self.heatmap_button.grid(row=5, column=1, padx=3, pady=3, sticky='ew')
         self.compare_button = app.button(self.frame, 'Compare before / after', self.show_comparison, state='disabled')
         self.compare_button.grid(row=6, column=0, columnspan=2, sticky='ew', padx=3, pady=3)
-        self.status = label('Loading traffic...', 7)
+        self.emergency_button = app.button(self.frame, 'Simulate emergency services',
+                                           self.show_emergency, state='disabled')
+        self.emergency_button.configure(font=app.small_font)
+        self.emergency_button.grid(row=7, column=0, columnspan=2, sticky='ew', padx=3, pady=3)
+        self.status = label('Loading traffic...', 8)
+        self.emergency = EmergencyController(self)
+        self.compact = False
+
+    def set_compact(self, compact):
+        if compact == self.compact:
+            return
+        self.compact = compact
+        for button in (self.play_button, self.block_button, self.clear_button, self.impact_button,
+                       self.heatmap_button, self.compare_button, self.emergency_button):
+            button.configure(height=26 if compact else 32)
+            button.configure(font=self.app.small_font if compact or button is self.emergency_button else self.app.font)
+            button.grid_configure(pady=1 if compact else 3)
+        self.speed_picker.configure(height=26 if compact else 28)
+        self.speed_picker.grid_configure(pady=1 if compact else 3)
+        self.app.after_idle(self.app.resize_detail_body)
+
+    def show_emergency(self):
+        if self.enabled and self.result:
+            self.emergency.show()
 
     def set_enabled(self, enabled):
         self.enabled = enabled
@@ -90,6 +114,7 @@ class SimulationController:
         else:
             self.running = False
             self.cancel.set()
+            self.emergency.suspend()
             self.play_button.configure(text='Play')
             self.frame.pack_forget()
             self.flow.hide()
@@ -104,6 +129,7 @@ class SimulationController:
         self.app.after_idle(self.app.resize_detail_body)
 
     def selection_changed(self):
+        self.emergency.selection_changed()
         target = self.app.selection
         ready = self.enabled and self.model is not None and target is not None
         if ready:
@@ -167,6 +193,7 @@ class SimulationController:
         key = (hour, frozenset(self.blocked_edges), frozenset(self.blocked_nodes))
         if key != self.requested_key:
             self.cancel.set()
+            self.emergency.invalidate()
             self.requested_key = key
             self.active_diversion = None
             self.status.configure(text='Calculating scenario / previous frame retained')
@@ -190,7 +217,8 @@ class SimulationController:
 
     def paint_key(self):
         route = self.active_diversion.route.edge_ids if self.active_diversion else None
-        return self.app.camera, self.result_key, self.app.selection, route, self.heatmap_enabled
+        return (self.app.camera, self.result_key, self.app.selection, route, self.heatmap_enabled,
+                id(self.emergency.current_report), self.emergency.kind, self.emergency.current_route)
 
     def display(self, bitmap):
         self.bitmap = bitmap
@@ -204,6 +232,7 @@ class SimulationController:
                                    f'Rerouted {r.rerouted_demand:,.0f} / unmet {r.unmet_demand:,.0f} veh/h' +
                                    (' / approximate' if not r.converged else '')))
         self.compare_button.configure(state='normal')
+        self.emergency_button.configure(state='normal')
         self.impact_button.configure(state='normal' if self.report.closed_roads else 'disabled')
         self.app.after_idle(self.app.resize_detail_body)
         if self.app.selection and self.app.selection[0] == 'road':
@@ -242,6 +271,7 @@ class SimulationController:
                     self.status.configure(text=display_text(f'Scenario failed: {error}\nChange hour or blocks to retry.'))
                     self.running = False
                     self.play_button.configure(text='Play')
+        self.emergency.tick()
         if not self.enabled:
             return
         if self.model:
@@ -283,11 +313,17 @@ class SimulationController:
             result, report, selected, diversion = self.result, self.report, self.app.selection, self.active_diversion
             camera = self.app.camera
             heatmap = self.heatmap_enabled
+            emergency_report, emergency_kind = self.emergency.current_report, self.emergency.kind
+            emergency_route = self.emergency.current_route
             view = self.datasets['views']['KML road graph']
             def paint():
                 bitmap, paths = self.painter.frame(camera, view, result,
                     selected=selection_roads(self.app.network, selected),
-                    impact=report, diversion=diversion, datasets=self.datasets, heatmap=heatmap)
+                    impact=report, diversion=diversion, datasets=self.datasets, heatmap=heatmap,
+                    emergency=emergency_report, emergency_kind=emergency_kind)
+                if emergency_route:
+                    from .emergency_rendering import paint_emergency_route
+                    paint_emergency_route(bitmap, camera, self.app.network, emergency_route)
                 return key, bitmap, paths
             self.paint_future = self.paint_pool.submit(paint)
         if self.fade_to is not None and self.bitmap_camera == self.app.camera:
@@ -306,7 +342,7 @@ class SimulationController:
             return
         if self.impact_window is None or not self.impact_window.winfo_exists():
             self.impact_window = ctk.CTkToplevel(self.app)
-            self.impact_window.title('CityCollapse / Closure impacts')
+            self.impact_window.title('vredefort / Closure impacts')
             self.impact_window.geometry('390x760')
             self.impact_window.minsize(370, 520)
             self.impact_window.protocol('WM_DELETE_WINDOW', self.impact_window.withdraw)
@@ -346,8 +382,11 @@ class SimulationController:
         self.fit_roads(option.route.edge_ids)
 
     def fit_roads(self, identifiers):
-        import math
         points = [p for identifier in identifiers for path in self.app.network.roads_by_id[identifier].paths for p in path]
+        self.fit_points(points)
+
+    def fit_points(self, points):
+        import math
         if not points:
             return
         xs, ys = zip(*points)
@@ -382,6 +421,7 @@ class SimulationController:
         self.comparison.window.lift()
 
     def close(self):
+        self.emergency.close()
         if self.comparison:
             self.comparison.close()
         self.cancel.set()

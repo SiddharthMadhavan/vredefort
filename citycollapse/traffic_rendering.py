@@ -36,11 +36,15 @@ class TrafficPainter:
             self.camera, self.view = camera, view
         return paint_traffic(camera, view, result, selected, self.paths, impact, heatmap)
 
-    def frame(self, camera, view, result, selected=None, impact=None, diversion=None, datasets=None, heatmap=False):
+    def frame(self, camera, view, result, selected=None, impact=None, diversion=None, datasets=None, heatmap=False,
+              emergency=None, emergency_kind=None):
         from .traffic_animation import prepare_flow_paths
         image = self.paint(camera, view, result, selected=selected, impact=impact, heatmap=heatmap)
         if impact and impact.closed_roads:
             paint_impacts(image, camera, view, self.paths, impact, diversion, datasets, result.blocked_nodes)
+        if emergency is not None:
+            from .emergency_rendering import paint_emergency
+            paint_emergency(image, camera, emergency, emergency_kind)
         return image, prepare_flow_paths(camera, self.paths, result)
 
 

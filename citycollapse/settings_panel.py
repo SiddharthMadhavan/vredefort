@@ -8,7 +8,7 @@ class SettingsPanel:
     def __init__(self, app):
         self.app = app
         self.window = ctk.CTkToplevel(app)
-        self.window.title('CityCollapse / Settings')
+        self.window.title('vredefort / Settings')
         self.window.configure(fg_color='#0c1510')
         scale = self.window._get_window_scaling()
         height = min(570, int((self.window.winfo_screenheight() - 120) / scale))

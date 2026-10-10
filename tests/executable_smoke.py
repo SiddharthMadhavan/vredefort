@@ -19,5 +19,6 @@ with tempfile.TemporaryDirectory() as working:
     result = json.loads(report.read_text())
     assert completed.returncode == 0 and result['status'] == 'passed', result
     assert result['frozen'] and result['bundled_env_absent'] and result['persistent_cache']
+    assert result['emergency_access'] and result['emergency_route'] and result['app_title'].startswith('vredefort')
     print('Executable smoke passed: standalone launch, bundled graph/fonts/datasets, '
-          'encrypted API settings, validation, key clearing, simulation and road closure.', flush=True)
+          'encrypted API settings, validation, key clearing, simulation, road closure, emergency access and title.', flush=True)

@@ -38,7 +38,7 @@ class CityCollapseApp(ctk.CTk):
         if sys.platform == 'win32' and FONT_FILE.exists():
             ctypes.windll.gdi32.AddFontResourceExW(str(FONT_FILE), 0x10, 0)
         super().__init__()
-        self.title('CityCollapse / Road explorer')
+        self.title('vredefort / Road explorer')
         scale = self._get_window_scaling()
         width = min(1400, int((self.winfo_screenwidth() - 80) / scale))
         height = min(900, int((self.winfo_screenheight() - 140) / scale))
@@ -122,7 +122,7 @@ class CityCollapseApp(ctk.CTk):
         self.details.place(x=16, y=16)
         heading = ctk.CTkFrame(self.details, fg_color='transparent')
         heading.pack(fill='x', padx=16, pady=(12, 0))
-        ctk.CTkLabel(heading, text='CITYCOLLAPSE_', text_color=FG,
+        ctk.CTkLabel(heading, text='vredefort_', text_color=FG,
                      font=ctk.CTkFont(self.font_name, 28)).pack(
                          side='left')
         self.settings_button = self.button(heading, 'Settings', self.show_settings,
@@ -519,6 +519,8 @@ class CityCollapseApp(ctk.CTk):
             if road:
                 self.toggle_area_road(road.id)
             return
+        if self.simulation.emergency.pick(x, y):
+            return
         node = nearest_node(self.network, self.camera, x, y)
         if node:
             self.select_node(node['id'])
@@ -572,6 +574,8 @@ class CityCollapseApp(ctk.CTk):
         scaling = self.details._get_widget_scaling()
         sim = getattr(self, 'simulation', None)
         compact = sim and sim.enabled and self.camera.height / scaling < 650
+        if sim:
+            sim.set_compact(bool(compact))
         if compact:
             self.subtitle.pack_forget()
             sim.legend.grid_remove()

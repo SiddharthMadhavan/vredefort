@@ -38,6 +38,8 @@ def run_self_test(report_path):
                 assert (ROOT / 'data/synthetic/bengaluru_road_traffic_synthetic_hourly.csv.gz').exists()
                 report.update(roads=len(app.network.roads), nodes=len(app.network.nodes),
                     frozen=bool(getattr(sys, 'frozen', False)), bundled_resources=True)
+                assert app.title() == 'vredefort / Road explorer'
+                report['app_title'] = app.title()
                 if report['frozen']:
                     assert not (ROOT / '.env').exists() and not (ROOT / '.env.local').exists()
                     assert USER_DIR in CACHE_DIR.parents and ROOT not in CACHE_DIR.parents
@@ -101,6 +103,29 @@ def run_self_test(report_path):
                 assert sim.result.links[identifier].closed
                 assert not sim.baseline_result.links[identifier].closed
                 report.update(simulation=True, closure_and_baseline=True, settings_button=True)
+                sim.emergency_button.invoke()
+                stage = 'emergency'
+            elif stage == 'emergency':
+                sim = app.simulation
+                assert not sim.emergency.error, sim.emergency.error
+                if not sim.emergency.current_report or sim.painted_key != sim.paint_key():
+                    app.after(60, check)
+                    return
+                emergency = sim.emergency.current_report
+                assert len(emergency.points) == len(app.network.nodes) * 2
+                assert emergency.anchors and sim.emergency.panel.report is emergency
+                report.update(emergency_access=True, emergency_facilities=len(emergency.anchors))
+                point = next(p for p in emergency.points if p.kind == 'hospitals' and p.facility and p.status == 'delayed')
+                sim.emergency.focus(point)
+                stage = 'emergency_route'
+            elif stage == 'emergency_route':
+                sim = app.simulation
+                assert sim.emergency.current_route and sim.emergency.current_route.facility.kind == 'hospitals'
+                if sim.painted_key != sim.paint_key() or sim.fade_to is not None:
+                    app.after(60, check)
+                    return
+                assert sum(r == 99 and g == 239 and b == 255 for r, g, b, a in sim.bitmap.getdata()) > 100
+                report['emergency_route'] = True
                 finish()
                 return
             app.after(60, check)
@@ -114,4 +139,5 @@ def run_self_test(report_path):
     app.worker.shutdown(wait=True, cancel_futures=True)
     app.simulation.pool.shutdown(wait=True, cancel_futures=True)
     app.simulation.paint_pool.shutdown(wait=True, cancel_futures=True)
+    app.simulation.emergency.pool.shutdown(wait=True, cancel_futures=True)
     return 0 if report.get('status') == 'passed' else 1

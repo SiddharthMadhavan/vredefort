@@ -23,7 +23,7 @@ class ComparisonView:
         self.app = simulation.app
         self.window = ctk.CTkToplevel(self.app)
         self.window.configure(fg_color='#0c1510')
-        self.window.title('CityCollapse / Before and after')
+        self.window.title('vredefort / Before and after')
         scale = self.window._get_window_scaling()
         width = min(1160, int((self.window.winfo_screenwidth()-80)/scale))
         height = min(820, int((self.window.winfo_screenheight()-140)/scale))

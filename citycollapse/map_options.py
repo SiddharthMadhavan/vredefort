@@ -7,7 +7,7 @@ class MapOptions:
     def __init__(self, app):
         self.app = app
         self.window = ctk.CTkToplevel(app)
-        self.window.title('CityCollapse / Basemap')
+        self.window.title('vredefort / Basemap')
         self.window.geometry('430x380')
         self.window.resizable(False, False)
         self.window.configure(fg_color='#0c1510')
